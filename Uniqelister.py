@@ -45,8 +45,10 @@ def countmult(fastdict):
 		counter+=1
 	routstring=outstring.replace("\n\n\n","\n")
 	outstring=routstring.replace("\n\n","\n")
-	print outstring
-
+	if len(outstring)>1:
+		print outstring
+	else:
+		print 'No identical sequences in this fasta file.'
 	# print Counter(seqs).most_common(2)
 	return
 
@@ -57,7 +59,11 @@ def main():
 		sys.exit(1)
 	else:
 		input=args[1]
-	fastdict=fastadicter(input)
-	countmult(fastdict)
+	if '.fas' in input:
+		fastdict=fastadicter(input)
+		countmult(fastdict)
+	else:
+		print 'Please use fasta file.'
+		sys.exit(1)
 if __name__ == '__main__':
 	main()
