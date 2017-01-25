@@ -9,19 +9,19 @@ def fasdict(input):
     faslines = inputf.readlines()
     inputf.close()
     fastdict={}
-    for i,line in enumerate(faslines):
-    	if i ==0:
-    		nel=0
-    	if '>' in line:
-    		if nel:
-    			fastdict[fasname]=nel
-    		fasname = line.strip('>').rstrip('\n')
-    		nel=''
-    	else:
-    		nel+=line.rstrip('\n')
-    	if i ==len(faslines)-1:
-    		fastdict[fasname]=nel
-    	fastdict[fasname]=nel
+    for i,l in enumerate(faslines):
+        line=l.rstrip('\n')
+        if '>' in line and i>0:
+            fastdict[nel]=name
+            name=line.strip('>')
+            nel=''
+        elif '>' in line and i ==0:
+            name=line.strip('>')
+            nel=''
+        elif i == len(faslines)-1:
+            fastdict[nel]=name
+        else:
+            nel+=line
     return fastdict
 
 
@@ -36,7 +36,7 @@ def main():
         seqfile=args[2]
         outfile=args[4]
     namedict=fasdict(namefile)
-    seqdict=fasdict(seqfile)
+    # seqdict=fasdict(seqfile)
     print namedict.values()
 
 if __name__ == '__main__':
