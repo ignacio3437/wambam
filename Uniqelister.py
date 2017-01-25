@@ -4,9 +4,12 @@
 import os,sys
 
 """
-Given a fasta file. This will find duplicates and if there are any it will print a list of them."""
+Given a fasta file. This will find duplicates and if there are any it will print a list of them.
+To WHO"""
 
-
+def nothing(thing):
+	return
+	
 def fastadicter(input):
 	inputf= open(input, 'ru')
 	fastdict={}
