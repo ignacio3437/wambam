@@ -26,7 +26,11 @@ def fasdict(input):
 
 
 def merger(ndict,sdict,outfile):
-# check for duplicates
+    nseqs=[n for n in ndict.keys() if ndict[n] !='dup']
+    with open (outfile,'w') as out:
+        out.write("NEW_Name\tOLD_Name\tSeq\n")
+        for n in nseqs:
+            out.write('%s\t%s\t%s\n'%(ndict[n],sdict[n],n))
     return
 
 
