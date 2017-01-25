@@ -6,23 +6,28 @@ Given a fasta file. This will find duplicates and if there are any it will print
 
 def fasdict(input):
     inputf= open(input, 'ru')
-    faslines = inputf.readlines()
+    faslines = [line.rstrip('\n') for line in inputf.readlines()]
     inputf.close()
     fastdict={}
-    for i,l in enumerate(faslines):
-        line=l.rstrip('\n')
-        if '>' in line and i>0:
-            fastdict[nel]=name
-            name=line.strip('>')
-            nel=''
-        elif '>' in line and i ==0:
-            name=line.strip('>')
-            nel=''
-        elif i == len(faslines)-1:
-            fastdict[nel]=name
+    for i,x in enumerate(faslines):
+        if '>' in x:
+            if i >0:
+                if ''.join(seq) in fastdict:
+                    fastdict[''.join(seq)]='dup'
+                else:
+                    fastdict[''.join(seq)]=name
+            name = x.strip('>')
+            seq=[]
         else:
-            nel+=line
+            seq.append(x)
+    if ''.join(seq) not in fastdict:
+        fastdict[''.join(seq)]=name
     return fastdict
+
+
+def merger(ndict,sdict,outfile):
+# check for duplicates
+    return
 
 
 def main():
@@ -36,8 +41,11 @@ def main():
         seqfile=args[2]
         outfile=args[4]
     namedict=fasdict(namefile)
-    # seqdict=fasdict(seqfile)
-    print namedict.values()
+    seqdict=fasdict(seqfile)
+    merger(namedict,seqdict,outfile)
+
+    # print '\n'.join(namedict.keys())
+    # print '\n'.join(namedict.values())
 
 if __name__ == '__main__':
     main()
