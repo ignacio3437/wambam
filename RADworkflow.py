@@ -26,26 +26,19 @@ def installtest():
     return
 
 
-def thinner(pwd,basename):
+def vcftoevec(pwd,basename,prune):
     os.chdir(pwd)
-    thin=basename+'_t'
-    commands.getoutput("vcftools --vcf %s.vcf --out %s --thin 500000 --recode"%(basename,thin))
-    print commands.getoutput("mv %s.recode.vcf %s.vcf"%(thin,thin))
-    return thin
-
-
-def vcftoevec(pwd,basename):
-    os.chdir(pwd)
-    baseout=basename+'_o'
-    vcfoutput=commands.getoutput("vcftools --vcf %s.vcf --out %s --plink"%(basename,baseout))
-    print commands.getoutput("awk '$1=1' %s.map > %s_temp.map"%(baseout,baseout))
-    print commands.getoutput("mv %s_temp.map %s.map"%(baseout,baseout))
-
-    ###Testing prune LD method
-    # commands.getoutput("plink --noweb --file %s --indep-pairwise 50 10 0.1"%(baseout))
-    # commands.getoutput("plink --noweb --file %s --extract plink.prune.in --recode --out %s"%(baseout,baseout))
-    #
-
+    original=basename
+    vcfoutput=commands.getoutput("vcftools --vcf %s.vcf --out %s_o --plink"%(basename,basename))
+    basename=original+'_o'
+    print commands.getoutput("awk '$1=1' %s.map > %s_temp.map"%(basename,basename))
+    print commands.getoutput("mv %s_temp.map %s.map"%(basename,basename))
+    if prune=="ON":
+        baseprune=original+'_p'
+        commands.getoutput("plink --noweb --file %s --indep 50 10 2"%(basename))
+        commands.getoutput("plink --noweb --file %s --extract plink.prune.in --recode --remove W92455.txt --out %s"%(basename,baseprune))
+        # commands.getoutput("plink --noweb --file %s --extract plink.prune.in --recode --out %s"%(basename,basename))
+        basename=baseprune
     with open(pwd+'pca.par','w') as pca:
         pca.write("""
     genotypename:    %s.ped
@@ -59,9 +52,9 @@ def vcftoevec(pwd,basename):
     grmoutname:      grmjunk
     numthreads:   8
     lsqproject:	YES
-        """%(baseout,baseout,baseout,baseout,baseout))
+        """%(basename,basename,basename,basename,basename))
     ### add     outliersigmathresh: 7 if you want less outliers
-    pcafile='%s%s.evec'%(pwd,baseout)
+    pcafile='%s%s.evec'%(pwd,basename)
     pcaoutfile=pwd+basename+'_pcaout.txt'
     pcaout=commands.getoutput("smartpca -p pca.par")
     with open(pcaoutfile,'w') as pcaoutfile:
@@ -77,18 +70,19 @@ def vcftoevec(pwd,basename):
     ### Find outliers and print to outlierfile
     if 'REMOVED outlier' in pcaout:
         outliers=re.findall(r'REMOVED outlier (\w*)',pcaout)
-    with open(pwd+baseout+'_outliers.txt', 'w') as outlierfile:
+    with open(pwd+basename+'_outliers.txt', 'w') as outlierfile:
         for outlier in outliers:
             outlierfile.write(outlier+'\n')
     print "There are %d outliers in PCA analysis of %s"%(len(outliers),basename)
     ### Create keep.txt file for pyrad with outliers removed???
-    return pcafile,axes
+    return pcafile,axes,basename
 
 
 def RplotPCA(pcafile,pwd,basename,axes):
     ###Merges PCA output and Datafile in R then prints XY plots as PNG in pwd.
     ###Datafile must be tsv with headers: Samples, LAT, LON, COI[_cor]
-    ro.r('evec <- read.table(file="%s%s_o.evec")'%(pwd,basename))
+    print basename
+    ro.r('evec <- read.table(file="%s%s.evec")'%(pwd,basename))
     ro.r('dat <- read.table(file="%sdata.txt",header=TRUE)'%(pwd))
     ro.r('m2 <- merge(dat,evec,by.x="Sample",by.y="V1")')
     m2=ro.r['m2']
@@ -123,21 +117,23 @@ def cleanup(pwd):
             pass
     return
 
-def controller(things):
+def controller(pwd,basename,prune):
+    pcafile,axes,basename=vcftoevec(pwd,basename,prune)
+    RplotPCA(pcafile,pwd,basename,axes)
+    cleanup(pwd)
     pass
 
 def main():
     #pwd=commands.getoutput('pwd')
     #basename = raw_input("Enter basename of VCF file:\n")
+    installtest()
     pwd='/Users/josec/Desktop/Trapdoor/pyrad5/7pyrad5_outfiles/PopGenAnalysis/'
     basename="7pyrad5"
-    pcafile,axes=vcftoevec(pwd,basename)
-    RplotPCA(pcafile,pwd,basename,axes)
-    ### Comment out for Thin Options
-    thin=thinner(pwd,basename)
-    thinpcafile,axes2=vcftoevec(pwd,thin)
-    RplotPCA(thinpcafile,pwd,thin,axes2)
-    cleanup(pwd)
+    prune="ON"
+    controller(pwd,basename,prune)
+    prune="OFF"
+    controller(pwd,basename,prune)
+
 
 if __name__ == '__main__':
     main()
