@@ -6,6 +6,7 @@ import scipy as sp
 from pandas import *
 from rpy2.robjects.packages import importr
 import rpy2.robjects as ro
+# from multiprocessing import Pool, TimeoutError
 grdevices = importr('grDevices')
 rprint = ro.globalenv.get("print")
 rplot=ro.r('plot')
@@ -18,6 +19,9 @@ def installtest():
     testlist.append(commands.getoutput("raxmlHPC-PTHREADS-SSE3 -v"))
     testlist.append(commands.getoutput("r --version"))
     testlist.append(commands.getoutput("ipyrad -v"))
+    testlist.append(commands.getoutput("admixture -v"))
+    testlist.append(commands.getoutput("plink2 -v"))
+
     for x in testlist:
         if "command not found" in x:
             print x
@@ -35,9 +39,8 @@ def vcftoevec(pwd,basename,prune):
     print commands.getoutput("mv %s_temp.map %s.map"%(basename,basename))
     if prune=="ON":
         baseprune=original+'_p'
-        commands.getoutput("plink --noweb --file %s --indep 50 10 2"%(basename))
-        commands.getoutput("plink --noweb --file %s --extract plink.prune.in --recode --remove W92455.txt --out %s"%(basename,baseprune))
-        # commands.getoutput("plink --noweb --file %s --extract plink.prune.in --recode --out %s"%(basename,basename))
+        commands.getoutput("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(basename))
+        commands.getoutput("plink2 --file %s --threads 7 --extract plink.prune.in --recode --remove W92455.txt --out %s"%(basename,baseprune))
         basename=baseprune
     with open(pwd+'pca.par','w') as pca:
         pca.write("""
@@ -70,9 +73,11 @@ def vcftoevec(pwd,basename,prune):
     ### Find outliers and print to outlierfile
     if 'REMOVED outlier' in pcaout:
         outliers=re.findall(r'REMOVED outlier (\w*)',pcaout)
+    else:
+        outliers=[]
     with open(pwd+basename+'_outliers.txt', 'w') as outlierfile:
         for outlier in outliers:
-            outlierfile.write(outlier+'\n')
+            outlierfile.write(outlier+'\t'+'outlier'+'\n')
     print "There are %d outliers in PCA analysis of %s"%(len(outliers),basename)
     ### Create keep.txt file for pyrad with outliers removed???
     return pcafile,axes,basename
@@ -97,8 +102,26 @@ def RplotPCA(pcafile,pwd,basename,axes):
     return
 
 
+def admixture(pwd,basename,k):
+    admixoutdir=pwd+"admixture/"
+    if not os.path.exists(admixoutdir):
+        os.mkdir(admixoutdir)
+    shutil.copy(basename+".map",admixoutdir)
+    shutil.copy(basename+".ped",admixoutdir)
+    shutil.copy(basename+"_outliers.txt",admixoutdir)
+    os.chdir(admixoutdir)
+    ###Without removing outliers from the PCA analysis
+    ###commands.getoutput("plink2 --threads 7 --file %s --make-bed --out %s"%(basename,basename))
+    commands.getoutput("plink2 --threads 7 --file %s --make-bed --remove %s_outliers.txt --out %s"%(basename,basename,basename))
+    for x in range(1,k):
+        print commands.getoutput("admixture -j7 -C=0.01 --cv %s.ped %s"%(basename,x))
+    os.chdir(pwd)
+    return
+
+
 def raxer(pwd,basename,bs):
     print commands.getoutput("raxmlHPC-PTHREADS-SSE3 -T 8 -f a -n %s -s %s.phy -x %d -N %d -m GTRCAT -p %d"%(basename,basename,random.randint(0,999999),bs,random.randint(0,999999)))
+    # print "raxmlHPC-PTHREADS-SSE3 -T 8 -f a -n %s -s %s.phy -x %d -N %d -m GTRCAT -p %d"%(basename,basename,random.randint(0,999999),bs,random.randint(0,999999))
     tree="RAxML_bipartitionsBranchLabels."+basename
     return treefile
 
@@ -120,6 +143,7 @@ def cleanup(pwd):
 def controller(pwd,basename,prune):
     pcafile,axes,basename=vcftoevec(pwd,basename,prune)
     RplotPCA(pcafile,pwd,basename,axes)
+    admixture(pwd,basename,3)
     cleanup(pwd)
     pass
 
@@ -131,9 +155,19 @@ def main():
     basename="7pyrad5"
     prune="ON"
     controller(pwd,basename,prune)
-    prune="OFF"
-    controller(pwd,basename,prune)
-
+    # prune="OFF"
+    # controller(pwd,basename,prune)
+    return
 
 if __name__ == '__main__':
     main()
+
+
+    """
+    # pool = Pool(processes=4)
+    # pool.apply_async(
+    # pool.close()
+    # pool.join()
+
+
+    # Pool(processes=4).map(admixture,range(10))"""
