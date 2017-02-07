@@ -96,6 +96,27 @@ def RplotPCA(pcafile,pwd,basename,axes):
     grdevices.dev_off()
     return
 
+def readpop(popfile):
+	popdict={}
+	with open(popfile, 'ru') as pop:
+		poplist2 = pop.readlines()
+		poplist = [p.strip('\n').strip() for p in poplist2]
+		for i,pop in enumerate(poplist[0]):
+			popdict[i]=pop
+	return popdict
+def readq(qfile):
+	groupdict = {}
+	with open(qfile, 'ru') as qf:
+		qlines= [q.strip('\n').split() for q in qf.readlines()]
+		for q,line in enumerate(qlines):
+			for i,column in enumerate(line):
+				if float(column)>float(0.7):
+					group=i+1
+					break
+				else:
+					group=len(column)+1
+			groupdict[q]=group
+	return groupdict
 
 def admixture(pwd,basename,k):
     print "start admixture"
@@ -140,13 +161,12 @@ def admixture(pwd,basename,k):
                 lowest=float(cvd[key])
                 lowestk=key
     ro.r('cvs <- read.table(file="%s",header=FALSE)'%(admixoutdir+"cv.txt"))
-    print ro.r['m2']
     cvs=ro.r['cvs']
     grdevices.png(file="%s/CVplot.png"%(admixoutdir), width=1000, height=1000)
     rplot(cvs.rx2("V1"),cvs.rx2("V2"),main="CVplot",ylab="CVeror",xlab="K",pch=20,cex=1.5)
     grdevices.dev_off()
     os.chdir(pwd)
-    print "Best value for K is %s with a CV of%s"%(lowestk,lowest)
+    print "Best value for K is %s with a CV of %s"%(lowestk,lowest)
     return lowestk
 
 
@@ -164,12 +184,11 @@ def cleanup(pwd):
     finpath=pwd+"final/"
     if not os.path.exists(finpath):
         os.mkdir(finpath)
-    for file in os.listdir(pwd):
-        if 'png' in file:
-            shutil.move(pwd+file,figpath+file)
-    for file in os.listdir(pwd+"/admixture/"):
-        if 'png' in file:
-            shutil.move(pwd+"/admixture/"+file,figpath+file)
+
+    for (dirpath, dirnames, filenames) in os.walk(pwd):
+        for file in filenames:
+            if file.endswith("png"):
+                shutil.move(pwd+file,figpath+file)
     return
 
 def controller(pwd,basename,prune,k):
@@ -186,7 +205,7 @@ def main():
     installtest(pwd)
     basename="7pyrad5"
     prune="ON"
-    k=4
+    k=2
     controller(pwd,basename,prune,k+1)
     # prune="OFF"
     # controller(pwd,basename,prune)
