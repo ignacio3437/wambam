@@ -1,5 +1,5 @@
 #!/usr/bin/python
-import os,sys,re,commands,shutil
+import os,sys,re,subprocess,shutil,shlex
 import random
 from numpy import *
 import scipy as sp
@@ -13,20 +13,14 @@ rplot=ro.r('plot')
 
 
 def installtest(pwd):
-    testlist=[]
     os.chdir(pwd)
-    testlist.append(commands.getoutput("smartpca -v"))
-    testlist.append(commands.getoutput("vcftools"))
-    testlist.append(commands.getoutput("raxmlHPC-PTHREADS-SSE3 -v"))
-    testlist.append(commands.getoutput("r --version"))
-    testlist.append(commands.getoutput("ipyrad -v"))
-    testlist.append(commands.getoutput("admixture -v"))
-    testlist.append(commands.getoutput("plink2 -v"))
-
-    for x in testlist:
-        if "command not found" in x:
-            print x
-            sys.exit()
+    subprocess.check_output(shlex.split("smartpca -v"))
+    v=subprocess.check_output(shlex.split("vcftools"))
+    subprocess.check_output(shlex.split("raxmlHPC-PTHREADS-SSE3 -v"))
+    subprocess.check_output(shlex.split("r --version"))
+    p=subprocess.check_output(shlex.split("ipyrad --version"))
+    subprocess.check_output(shlex.split("admixture --help"))
+    subprocess.check_output(shlex.split("plink2 --version"))
     print "All programs installed"
     return
 
@@ -34,14 +28,15 @@ def installtest(pwd):
 def vcftoevec(pwd,basename,prune):
     os.chdir(pwd)
     original=basename
-    vcfoutput=commands.getoutput("vcftools --vcf %s.vcf --out %s_o --plink"%(basename,basename))
+    vcfoutput=subprocess.check_output(shlex.split("vcftools --vcf %s.vcf --out %s_o --plink"%(basename,basename)))
     basename=original+'_o'
-    print commands.getoutput("awk '$1=1' %s.map > %s_temp.map"%(basename,basename))
-    print commands.getoutput("mv %s_temp.map %s.map"%(basename,basename))
+    with open("%s_temp.map"%(basename),"w") as outfile:
+        subprocess.call(shlex.split("awk '$1=1' %s.map"%(basename)),stdout=outfile)
+    print subprocess.check_output(shlex.split("mv %s_temp.map %s.map"%(basename,basename)))
     if prune=="ON":
         baseprune=original+'_p'
-        commands.getoutput("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(basename))
-        commands.getoutput("plink2 --file %s --threads 7 --extract plink.prune.in --recode --remove W92455.txt --out %s"%(basename,baseprune))
+        subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(basename)))
+        subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --remove W92455.txt --out %s"%(basename,baseprune)))
         basename=baseprune
     with open(pwd+'pca.par','w') as pca:
         pca.write("""
@@ -60,7 +55,7 @@ def vcftoevec(pwd,basename,prune):
     ### add     outliersigmathresh: 7 if you want less outliers
     pcafile='%s%s.evec'%(pwd,basename)
     pcaoutfile=pwd+basename+'_pcaout.txt'
-    pcaout=commands.getoutput("smartpca -p pca.par")
+    pcaout=subprocess.check_output(shlex.split("smartpca -p pca.par"))
     with open(pcaoutfile,'w') as pcaoutfile:
         pcaoutfile.write(pcaout)
     ### Pull out eigenvalues and P values. Calculate %Variation using Eigenvalues and put as tuple axes to be used for plotting PCA later.
@@ -103,8 +98,8 @@ def RplotPCA(pcafile,pwd,basename,axes):
 
 
 def admixture(pwd,basename,k):
+    print "start admixture"
     os.chdir(pwd)
-    admixout=[]
     cvd={}
     admixoutdir=pwd+"admixture/"
     if not os.path.exists(admixoutdir):
@@ -114,16 +109,30 @@ def admixture(pwd,basename,k):
     shutil.copy(basename+"_outliers.txt",admixoutdir)
     os.chdir(admixoutdir)
     ###Without removing outliers from the PCA analysis
-    ###commands.getoutput("plink2 --threads 7 --file %s --make-bed --out %s"%(basename,basename))
-    commands.getoutput("plink2 --threads 7 --file %s --make-bed --geno 0.99 --remove %s_outliers.txt --out %s"%(basename,basename,basename))
+    ###subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --out %s"%(basename,basename)))
+    subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --geno 0.99 --remove %s_outliers.txt --out %s"%(basename,basename,basename)))
     for x in range(1,k):
-        output = commands.getoutput("admixture -j7 -C=0.01 --cv %s.bed %d"%(basename,x))
-        print "Admixture: Finished K=%d"%(x)
-        admixout.append(output)
-        cv=re.findall(r'CV .*K=(\d*).*: (\d*\.\d*)',output)
-        cvd[x]=cv[0][1]
-    with open(admixoutdir+"admixout.txt",'w') as admixoutfile:
-        admixoutfile.write("\n\n".join(admixout))
+        def admixer():
+            admixcommand=shlex.split("admixture -j7 -C=0.01 --cv %s.bed %d"%(basename,x))
+            popen = subprocess.Popen(admixcommand, stdout=subprocess.PIPE, universal_newlines=True)
+            with open(admixoutdir+"admixout.txt",'a') as admixoutfile:
+                admixoutfile.write("K=%s\n"%(x))
+                for stdout_line in iter(popen.stdout.readline, ""):
+                    print stdout_line
+                    admixoutfile.write(stdout_line)
+                    if "nan" in stdout_line:
+                        return
+                    elif "CV" in stdout_line:
+                        cv=re.findall(r'CV .*K=(\d*).*: (\d*\.\d*)',stdout_line)
+                        cvd[x]=cv[0][1]
+                popen.stdout.close()
+                return_code = popen.wait()
+                if return_code:
+                    raise subprocess.CalledProcessError(return_code, cmd)
+            print "Admixture: Finished K=%d"%(x)
+        admixer()
+        #
+        #
     lowest=100
     lowestk="k"
     with open(admixoutdir+"cv.txt","w") as cvout:
@@ -138,11 +147,11 @@ def admixture(pwd,basename,k):
     rplot(cvs.rx2("V1"),cvs.rx2("V2"),main="CVplot",ylab="CVeror",xlab="K",pch=20,cex=1.5)
     grdevices.dev_off()
     os.chdir(pwd)
-    return lowestk,admixoutdir
+    return
 
 
 def raxer(pwd,basename,bs):
-    print commands.getoutput("raxmlHPC-PTHREADS-SSE3 -T 8 -f a -n %s -s %s.phy -x %d -N %d -m GTRCAT -p %d"%(basename,basename,random.randint(0,999999),bs,random.randint(0,999999)))
+    print subprocess.check_output(shlex.split("raxmlHPC-PTHREADS-SSE3 -T 8 -f a -n %s -s %s.phy -x %d -N %d -m GTRCAT -p %d"%(basename,basename,random.randint(0,999999),bs,random.randint(0,999999))))
     # print "raxmlHPC-PTHREADS-SSE3 -T 8 -f a -n %s -s %s.phy -x %d -N %d -m GTRCAT -p %d"%(basename,basename,random.randint(0,999999),bs,random.randint(0,999999))
     tree="RAxML_bipartitionsBranchLabels."+basename
     return treefile
@@ -161,25 +170,23 @@ def cleanup(pwd):
     for file in os.listdir(pwd+"/admixture/"):
         if 'png' in file:
             shutil.move(pwd+"/admixture/"+file,figpath+file)
-
     return
 
 def controller(pwd,basename,prune,k):
     pcafile,axes,basename=vcftoevec(pwd,basename,prune)
     RplotPCA(pcafile,pwd,basename,axes)
-    lowestk,admixoutdir=admixture(pwd,basename,k)
+    admixture(pwd,basename,k)
     cleanup(pwd)
     pass
 
 def main():
-    # pwd=commands.getoutput('pwd')
+    # pwd=subprocess.check_output(shlex.split('pwd'))
     #basename = raw_input("Enter basename of VCF file:\n")
     pwd='/Users/josec/Desktop/Trapdoor/pyrad5/7pyrad5_outfiles/PopGenAnalysis/'
     installtest(pwd)
     basename="7pyrad5"
     prune="ON"
-    k=30
-
+    k=7
     controller(pwd,basename,prune,k+1)
     # prune="OFF"
     # controller(pwd,basename,prune)
@@ -187,13 +194,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-    """
-    # pool = Pool(processes=4)
-    # pool.apply_async(
-    # pool.close()
-    # pool.join()
-
-
-    # Pool(processes=4).map(admixture,range(10))"""
