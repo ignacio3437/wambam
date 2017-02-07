@@ -15,10 +15,10 @@ rplot=ro.r('plot')
 def installtest(pwd):
     os.chdir(pwd)
     subprocess.check_output(shlex.split("smartpca -v"))
-    v=subprocess.check_output(shlex.split("vcftools"))
+    subprocess.check_output(shlex.split("vcftools"))
     subprocess.check_output(shlex.split("raxmlHPC-PTHREADS-SSE3 -v"))
     subprocess.check_output(shlex.split("r --version"))
-    p=subprocess.check_output(shlex.split("ipyrad --version"))
+    subprocess.check_output(shlex.split("ipyrad --version"))
     subprocess.check_output(shlex.split("admixture --help"))
     subprocess.check_output(shlex.split("plink2 --version"))
     print "All programs installed"
@@ -116,7 +116,7 @@ def admixture(pwd,basename,k):
             admixcommand=shlex.split("admixture -j7 -C=0.01 --cv %s.bed %d"%(basename,x))
             popen = subprocess.Popen(admixcommand, stdout=subprocess.PIPE, universal_newlines=True)
             with open(admixoutdir+"admixout.txt",'a') as admixoutfile:
-                admixoutfile.write("K=%s\n"%(x))
+                admixoutfile.write("####################K=%s\n####################\n"%(x))
                 for stdout_line in iter(popen.stdout.readline, ""):
                     print stdout_line
                     admixoutfile.write(stdout_line)
@@ -131,8 +131,6 @@ def admixture(pwd,basename,k):
                     raise subprocess.CalledProcessError(return_code, cmd)
             print "Admixture: Finished K=%d"%(x)
         admixer()
-        #
-        #
     lowest=100
     lowestk="k"
     with open(admixoutdir+"cv.txt","w") as cvout:
@@ -142,12 +140,14 @@ def admixture(pwd,basename,k):
                 lowest=float(cvd[key])
                 lowestk=key
     ro.r('cvs <- read.table(file="%s",header=FALSE)'%(admixoutdir+"cv.txt"))
+    print ro.r['m2']
     cvs=ro.r['cvs']
     grdevices.png(file="%s/CVplot.png"%(admixoutdir), width=1000, height=1000)
     rplot(cvs.rx2("V1"),cvs.rx2("V2"),main="CVplot",ylab="CVeror",xlab="K",pch=20,cex=1.5)
     grdevices.dev_off()
     os.chdir(pwd)
-    return
+    print "Best value for K is %s with a CV of%s"%(lowestk,lowest)
+    return lowestk
 
 
 def raxer(pwd,basename,bs):
@@ -186,7 +186,7 @@ def main():
     installtest(pwd)
     basename="7pyrad5"
     prune="ON"
-    k=7
+    k=4
     controller(pwd,basename,prune,k+1)
     # prune="OFF"
     # controller(pwd,basename,prune)
