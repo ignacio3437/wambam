@@ -36,7 +36,9 @@ def vcftoevec(pwd,basename,prune):
     if prune=="ON":
         baseprune=original+'_p'
         subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(basename)))
-        subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --remove W92455.txt --out %s"%(basename,baseprune)))
+        # subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --remove W92455.txt --out %s"%(basename,baseprune)))
+        subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --geno 0.9 --mind 0.9 --out %s"%(basename,baseprune)))
+
         basename=baseprune
     with open(pwd+'pca.par','w') as pca:
         pca.write("""
@@ -85,14 +87,17 @@ def RplotPCA(pcafile,pwd,basename,axes):
     ro.r('evec <- read.table(file="%s%s.evec")'%(pwd,basename))
     ro.r('dat <- read.table(file="%sdata.txt",header=TRUE)'%(pwd))
     ro.r('m2 <- merge(dat,evec,by.x="Sample",by.y="V1")')
+    ro.r("""palette(c('#8dd3c7','#ffffb3','#bebada',
+    '#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5',
+    '#d9d9d9','#bc80bd','#ccebc5','#ffed6f','black','darkgrey'))""")
     m2=ro.r['m2']
     # print m2
     ###Change color scheme by changing COI_col
     grdevices.png(file="%s/%s_MAP_COI.png"%(pwd,basename), width=1000, height=1000)
-    rplot(m2.rx2("LON"),m2.rx2("LAT"),col=m2.rx2("COI_cor"),main="%s_MAP_COI"%(basename),ylab="Lattitude",xlab="Longitude",pch=20,cex=1.5)
+    rplot(m2.rx2("LON"),m2.rx2("LAT"),col=m2.rx2("COI_5p"),main="%s_MAP_COI"%(basename),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
     grdevices.dev_off()
     grdevices.png(file="%s/%s_PCA_COI.png"%(pwd,basename), width=1000, height=1000)
-    rplot(m2.rx2("V2"),m2.rx2("V3"),col=m2.rx2("COI_cor"),main="%s_PCA_COI"%(basename),ylab=axes[1],xlab=axes[0],pch=20,cex=1.5)
+    rplot(m2.rx2("V2"),m2.rx2("V3"),col=m2.rx2("COI_5p"),main="%s_PCA_COI"%(basename),ylab=axes[1],xlab=axes[0],pch=20,cex=2)
     grdevices.dev_off()
     return
 
@@ -131,7 +136,7 @@ def admixture(pwd,basename,k):
     os.chdir(admixoutdir)
     ###Without removing outliers from the PCA analysis
     ###subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --out %s"%(basename,basename)))
-    subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --geno 0.99 --remove %s_outliers.txt --out %s"%(basename,basename,basename)))
+    subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --remove %s_outliers.txt --out %s"%(basename,basename,basename)))
     for x in range(1,k):
         def admixer():
             admixcommand=shlex.split("admixture -j7 -C=0.01 --cv %s.bed %d"%(basename,x))
@@ -139,7 +144,7 @@ def admixture(pwd,basename,k):
             with open(admixoutdir+"admixout.txt",'a') as admixoutfile:
                 admixoutfile.write("####################K=%s\n####################\n"%(x))
                 for stdout_line in iter(popen.stdout.readline, ""):
-                    print stdout_line
+                    # print stdout_line
                     admixoutfile.write(stdout_line)
                     if "nan" in stdout_line:
                         return
@@ -149,7 +154,7 @@ def admixture(pwd,basename,k):
                 popen.stdout.close()
                 return_code = popen.wait()
                 if return_code:
-                    raise subprocess.CalledProcessError(return_code, cmd)
+                    raise subprocess.CalledProcessError(return_code, admixcommand)
             print "Admixture: Finished K=%d"%(x)
         admixer()
     lowest=100
@@ -171,10 +176,10 @@ def admixture(pwd,basename,k):
 
 
 def raxer(pwd,basename,bs):
-    print subprocess.check_output(shlex.split("raxmlHPC-PTHREADS-SSE3 -T 8 -f a -n %s -s %s.phy -x %d -N %d -m GTRCAT -p %d"%(basename,basename,random.randint(0,999999),bs,random.randint(0,999999))))
-    # print "raxmlHPC-PTHREADS-SSE3 -T 8 -f a -n %s -s %s.phy -x %d -N %d -m GTRCAT -p %d"%(basename,basename,random.randint(0,999999),bs,random.randint(0,999999))
-    tree="RAxML_bipartitionsBranchLabels."+basename
-    return treefile
+    # print subprocess.check_output(shlex.split("raxmlHPC-PTHREADS-SSE3 -T 8 -f a -n %s -s %s.phy -x %d -N %d -m GTRCAT -p %d"%(basename,basename,random.randint(0,999999),bs,random.randint(0,999999))))
+    print "raxmlHPC-PTHREADS-SSE3 -T 8 -f a -n %s -s %s.phy -x %d -N %d -m GTRCAT -p %d"%(basename,basename,random.randint(0,999999),bs,random.randint(0,999999))
+    # tree="RAxML_bipartitionsBranchLabels."+basename
+    return
 
 
 def cleanup(pwd):
@@ -184,6 +189,7 @@ def cleanup(pwd):
     finpath=pwd+"final/"
     if not os.path.exists(finpath):
         os.mkdir(finpath)
+
     for (dirpath, dirnames, filenames) in os.walk(pwd):
         for file in filenames:
             if file.endswith("png"):
@@ -200,12 +206,16 @@ def controller(pwd,basename,prune,k):
 def main():
     # pwd=subprocess.check_output(shlex.split('pwd'))
     #basename = raw_input("Enter basename of VCF file:\n")
-    pwd='/Users/josec/Desktop/Trapdoor/pyrad5/7pyrad5_outfiles/PopGenAnalysis/'
+    pwd='/Users/josec/Desktop/agrf3/'
+    basename="r_7pyrad5"
+
     installtest(pwd)
-    basename="7pyrad5"
     prune="ON"
-    k=2
+    k=10
+    bs=50
     controller(pwd,basename,prune,k+1)
+    raxer(pwd,basename,bs)
+    print "ALLDone"
     # prune="OFF"
     # controller(pwd,basename,prune)
     return
