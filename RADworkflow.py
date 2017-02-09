@@ -184,7 +184,6 @@ def cleanup(pwd):
     finpath=pwd+"final/"
     if not os.path.exists(finpath):
         os.mkdir(finpath)
-
     for (dirpath, dirnames, filenames) in os.walk(pwd):
         for file in filenames:
             if file.endswith("png"):
