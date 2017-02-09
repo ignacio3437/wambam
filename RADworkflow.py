@@ -15,10 +15,10 @@ rplot=ro.r('plot')
 def installtest(pwd):
     os.chdir(pwd)
     subprocess.check_output(shlex.split("smartpca -v"))
-    v=subprocess.check_output(shlex.split("vcftools"))
+    subprocess.check_output(shlex.split("vcftools"))
     subprocess.check_output(shlex.split("raxmlHPC-PTHREADS-SSE3 -v"))
     subprocess.check_output(shlex.split("r --version"))
-    p=subprocess.check_output(shlex.split("ipyrad --version"))
+    subprocess.check_output(shlex.split("ipyrad --version"))
     subprocess.check_output(shlex.split("admixture --help"))
     subprocess.check_output(shlex.split("plink2 --version"))
     print "All programs installed"
@@ -101,6 +101,27 @@ def RplotPCA(pcafile,pwd,basename,axes):
     grdevices.dev_off()
     return
 
+def readpop(popfile):
+	popdict={}
+	with open(popfile, 'ru') as pop:
+		poplist2 = pop.readlines()
+		poplist = [p.strip('\n').strip() for p in poplist2]
+		for i,pop in enumerate(poplist[0]):
+			popdict[i]=pop
+	return popdict
+def readq(qfile):
+	groupdict = {}
+	with open(qfile, 'ru') as qf:
+		qlines= [q.strip('\n').split() for q in qf.readlines()]
+		for q,line in enumerate(qlines):
+			for i,column in enumerate(line):
+				if float(column)>float(0.7):
+					group=i+1
+					break
+				else:
+					group=len(column)+1
+			groupdict[q]=group
+	return groupdict
 
 def admixture(pwd,basename,k):
     print "start admixture"
@@ -121,7 +142,7 @@ def admixture(pwd,basename,k):
             admixcommand=shlex.split("admixture -j7 -C=0.01 --cv %s.bed %d"%(basename,x))
             popen = subprocess.Popen(admixcommand, stdout=subprocess.PIPE, universal_newlines=True)
             with open(admixoutdir+"admixout.txt",'a') as admixoutfile:
-                admixoutfile.write("K=%s\n"%(x))
+                admixoutfile.write("####################K=%s\n####################\n"%(x))
                 for stdout_line in iter(popen.stdout.readline, ""):
                     # print stdout_line
                     admixoutfile.write(stdout_line)
@@ -136,8 +157,6 @@ def admixture(pwd,basename,k):
                     raise subprocess.CalledProcessError(return_code, admixcommand)
             print "Admixture: Finished K=%d"%(x)
         admixer()
-        #
-        #
     lowest=100
     lowestk="k"
     with open(admixoutdir+"cv.txt","w") as cvout:
@@ -152,7 +171,8 @@ def admixture(pwd,basename,k):
     rplot(cvs.rx2("V1"),cvs.rx2("V2"),main="CVplot",ylab="CVeror",xlab="K",pch=20,cex=1.5)
     grdevices.dev_off()
     os.chdir(pwd)
-    return
+    print "Best value for K is %s with a CV of %s"%(lowestk,lowest)
+    return lowestk
 
 
 def raxer(pwd,basename,bs):
@@ -169,12 +189,11 @@ def cleanup(pwd):
     finpath=pwd+"final/"
     if not os.path.exists(finpath):
         os.mkdir(finpath)
-    for file in os.listdir(pwd):
-        if 'png' in file:
-            shutil.move(pwd+file,figpath+file)
-    for file in os.listdir(pwd+"admixture/"):
-        if 'png' in file:
-            shutil.move(pwd+"admixture/"+file,figpath+file)
+
+    for (dirpath, dirnames, filenames) in os.walk(pwd):
+        for file in filenames:
+            if file.endswith("png"):
+                shutil.move(pwd+file,figpath+file)
     return
 
 def controller(pwd,basename,prune,k):
