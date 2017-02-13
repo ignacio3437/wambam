@@ -33,6 +33,8 @@ def vcftoplink(pwd,basename,baseo,basep):
     print subprocess.check_output(shlex.split("mv %s_temp.map %s.map"%(basename,baseo)))
     ##Prunes the dataset
     subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(baseo)))
+    # subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep 50 10 2"%(baseo)))
+
     # subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --remove W92455.txt --out %s"%(baseo,basep)))
     subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --geno 0.9 --mind 0.9 --out %s"%(baseo,basep)))
     return
@@ -53,7 +55,7 @@ def PCAer(pwd,basep):
     numthreads:   8
     lsqproject:	YES
         """%(basep,basep,basep,basep,basep))
-    ### add     outliersigmathresh: 7 if you want less outliers
+    ### add     outliersigmathresh: 7 if you want more outliers
     pcaoutfile=pwd+basep+'_pcaout.txt'
     pcaout=subprocess.check_output(shlex.split("smartpca -p pca.par"))
     with open(pcaoutfile,'w') as pcaoutfile:
@@ -78,25 +80,36 @@ def PCAer(pwd,basep):
     return axes
 
 
-def RplotPCA(pcafile,pwd,basename,axes):
-    ###Merges PCA output and Datafile in R then prints XY plots as PNG in pwd.
+def Rplot(pwd,basename,type):
     ###Datafile must be tsv with headers: Samples, LAT, LON, COI[_cor]
-    ro.r('evec <- read.table(file="%s%s.evec")'%(pwd,basename))
     ro.r('dat <- read.table(file="%sdata.txt",header=TRUE)'%(pwd))
-    ro.r('m2 <- merge(dat,evec,by.x="Sample",by.y="V1")')
     ##Friendly random color palette!
     ro.r("""palette(c('#8dd3c7','#ffffb3','#bebada',
     '#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5',
-    '#d9d9d9','#bc80bd','#ccebc5','#ffed6f','black','forestgreen','deeppink'))""")
-    m2=ro.r['m2']
-    # print m2
-    ###Change color scheme by changing COI_col
-    grdevices.png(file="%s/%s_MAP_COI.png"%(pwd,basename), width=1000, height=1000)
-    rplot(m2.rx2("LON"),m2.rx2("LAT"),col=m2.rx2("COI_5p"),main="%s_MAP_COI"%(basename),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
-    grdevices.dev_off()
-    grdevices.png(file="%s/%s_PCA_COI.png"%(pwd,basename), width=1000, height=1000)
-    rplot(m2.rx2("V2"),m2.rx2("V3"),col=m2.rx2("COI_5p"),main="%s_PCA_COI"%(basename),ylab=axes[1],xlab=axes[0],pch=20,cex=2)
-    grdevices.dev_off()
+    '#d9d9d9','#bc80bd','#ccebc5','#ffed6f','black',
+    'forestgreen','brown','deeppink'))""")
+    if "PCA" in type[1]:
+        ##Merges PCA output and Datafile in R then prints XY plots as PNG in pwd.
+        ##Change coloring by searching from col=m2.rx2("XXXX")
+        ro.r('evec <- read.table(file="%s%s.evec")'%(pwd,basename))
+        ro.r('m2 <- merge(dat,evec,by.x="Sample",by.y="V1")')
+        dat=ro.r['dat']
+        m2=ro.r['m2']
+        grdevices.png(file="%s%s_MAP_COI.png"%(pwd,basename), width=1000, height=1000)
+        rplot(m2.rx2("LON"),m2.rx2("LAT"),col=m2.rx2("COI_5p"),main="%s_MAP_COI"%(basename),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
+        grdevices.dev_off()
+        grdevices.png(file="%s%s_PCA_COI.png"%(pwd,basename), width=1000, height=1000)
+        rplot(m2.rx2("V2"),m2.rx2("V3"),col=m2.rx2("COI_5p"),main="%s_PCA_COI"%(basename),ylab=type[1],xlab=type[0],pch=20,cex=2,)
+        grdevices.dev_off()
+    elif "CV" in type:
+        ##Print CV error plot to determine best K from admixture.
+        admixoutdir=pwd+"admixture/"
+        ro.r('cvs <- read.table(file="cv.txt",header=FALSE)')
+        cvs=ro.r['cvs']
+        grdevices.png(file="%s/CVplot.png"%(pwd), width=1000, height=1000)
+        rplot(cvs.rx2("V1"),cvs.rx2("V2"),main="CVplot",ylab="CVeror",xlab="K",pch=20,cex=1.5)
+        grdevices.dev_off()
+        os.chdir(pwd)
     return
 
 def readpop(popfile):
@@ -121,23 +134,24 @@ def readq(qfile):
 			groupdict[q]=group
 	return groupdict
 
-def admixture(pwd,basename,k):
+def admixture(pwd,base,k):
     print "start admixture"
     os.chdir(pwd)
     cvd={}
     admixoutdir=pwd+"admixture/"
     if not os.path.exists(admixoutdir):
         os.mkdir(admixoutdir)
-    shutil.copy(basename+".map",admixoutdir)
-    shutil.copy(basename+".ped",admixoutdir)
-    shutil.copy(basename+"_outliers.txt",admixoutdir)
+    shutil.copy(base+".map",admixoutdir)
+    shutil.copy(base+".ped",admixoutdir)
+    shutil.copy(base+"_outliers.txt",admixoutdir)
+    shutil.copy("data.txt",admixoutdir)
     os.chdir(admixoutdir)
-    ###Without removing outliers from the PCA analysis
-    ###subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --out %s"%(basename,basename)))
-    subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --remove %s_outliers.txt --out %s"%(basename,basename,basename)))
+    subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --out %s"%(base,base)))
+    ## make this a new function...?
+    ## subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --remove %s_outliers.txt --out %s"%(base,base,base)))
     for x in range(1,k):
         def admixer():
-            admixcommand=shlex.split("admixture -j7 -C=0.01 --cv %s.bed %d"%(basename,x))
+            admixcommand=shlex.split("admixture -j7 -C=0.01 --cv %s.bed %d"%(base,x))
             popen = subprocess.Popen(admixcommand, stdout=subprocess.PIPE, universal_newlines=True)
             with open(admixoutdir+"admixout.txt",'a') as admixoutfile:
                 admixoutfile.write("####################K=%s\n####################\n"%(x))
@@ -163,12 +177,7 @@ def admixture(pwd,basename,k):
             if float(cvd[key])<lowest:
                 lowest=float(cvd[key])
                 lowestk=key
-    ro.r('cvs <- read.table(file="%s",header=FALSE)'%(admixoutdir+"cv.txt"))
-    cvs=ro.r['cvs']
-    grdevices.png(file="%s/CVplot.png"%(admixoutdir), width=1000, height=1000)
-    rplot(cvs.rx2("V1"),cvs.rx2("V2"),main="CVplot",ylab="CVeror",xlab="K",pch=20,cex=1.5)
-    grdevices.dev_off()
-    os.chdir(pwd)
+    Rplot(admixoutdir,base,"CV")
     print "Best value for K is %s with a CV of %s"%(lowestk,lowest)
     return lowestk
 
@@ -189,20 +198,22 @@ def cleanup(pwd):
         os.mkdir(finpath)
     for (dirpath, dirnames, filenames) in os.walk(pwd):
         for file in filenames:
+            # print file
+            ##########FIX
             if file.endswith("png"):
-                shutil.move(pwd+file,figpath+file)
+                shutil.move(file,figpath)
     return
 
 def controller(pwd,basename,k):
     baseo='%s_o'%(basename)
     basep='%s_p'%(basename)
     pcafile='%s%s.evec'%(pwd,basename)
-    ##Comment out steps to skip them. PCAer() and RplotPCA() need to be run together
+    ##Comment out steps to skip them. PCAer() and Rplot() need to be run together
     vcftoplink(pwd,basename,baseo,basep)
     axes=PCAer(pwd,basep)
-    RplotPCA(pcafile,pwd,basep,axes)
-    # admixture(pwd,basename,k)
-    # cleanup(pwd)
+    Rplot(pwd,basep,axes)
+    admixture(pwd,basep,k)
+    cleanup(pwd)
     pass
 
 def main():
@@ -215,7 +226,7 @@ def main():
     k=10
     bs=50
     controller(pwd,basename,k+1)
-    raxer(pwd,basename,bs)
+    # raxer(pwd,basename,bs)
     print "ALLDone"
     return
 
