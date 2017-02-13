@@ -24,6 +24,17 @@ def installtest(pwd):
     return
 
 
+def loaddata(pwd,datafile):
+    ###Datafile must be tsv with headers: Samples, LAT, LON, COI[_cor]
+    ro.r('dat <- read.table(file="%s%s",header=TRUE)'%(pwd,datafile))
+    ##Friendly random color palette!
+    ro.r("""palette(c('#8dd3c7','#ffffb3','#bebada',
+    '#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5',
+    '#d9d9d9','#bc80bd','#ccebc5','#ffed6f','black',
+    'forestgreen','brown','deeppink'))""")
+    return
+
+
 def vcftoplink(pwd,basename,baseo,basep):
     os.chdir(pwd)
     vcfoutput=subprocess.check_output(shlex.split("vcftools --vcf %s.vcf --out %s --plink"%(basename,baseo)))
@@ -33,9 +44,6 @@ def vcftoplink(pwd,basename,baseo,basep):
     print subprocess.check_output(shlex.split("mv %s_temp.map %s.map"%(basename,baseo)))
     ##Prunes the dataset
     subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(baseo)))
-    # subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep 50 10 2"%(baseo)))
-
-    # subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --remove W92455.txt --out %s"%(baseo,basep)))
     subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --geno 0.9 --mind 0.9 --out %s"%(baseo,basep)))
     return
 
@@ -81,13 +89,6 @@ def PCAer(pwd,basep):
 
 
 def Rplot(pwd,basename,type):
-    ###Datafile must be tsv with headers: Samples, LAT, LON, COI[_cor]
-    ro.r('dat <- read.table(file="%sdata.txt",header=TRUE)'%(pwd))
-    ##Friendly random color palette!
-    ro.r("""palette(c('#8dd3c7','#ffffb3','#bebada',
-    '#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5',
-    '#d9d9d9','#bc80bd','#ccebc5','#ffed6f','black',
-    'forestgreen','brown','deeppink'))""")
     if "PCA" in type[1]:
         ##Merges PCA output and Datafile in R then prints XY plots as PNG in pwd.
         ##Change coloring by searching from col=m2.rx2("XXXX")
@@ -110,29 +111,16 @@ def Rplot(pwd,basename,type):
         rplot(cvs.rx2("V1"),cvs.rx2("V2"),main="CVplot",ylab="CVeror",xlab="K",pch=20,cex=1.5)
         grdevices.dev_off()
         os.chdir(pwd)
+    elif "admix" in type:
+        am2=ro.r['am2']
+        grdevices.png(file="%s%s_MAP_AdmixGroup.png"%(pwd,basename), width=1000, height=1000)
+        rplot(am2.rx2("LON"),am2.rx2("LAT"),col=am2.rx2("Sgroup"),main="%s_MAP_AdmixGroup"%(basename),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
+        grdevices.dev_off()
+        # grdevices.png(file="%s%s_PCA_COI.png"%(pwd,basename), width=1000, height=1000)
+        # rplot(am2.rx2("V2"),am2.rx2("V3"),col=am2.rx2("Sgroup"),main="%s_PCA_COI"%(basename),ylab=type[1],xlab=type[0],pch=20,cex=2,)
+        # grdevices.dev_off()`
     return
 
-def readpop(popfile):
-	popdict={}
-	with open(popfile, 'ru') as pop:
-		poplist2 = pop.readlines()
-		poplist = [p.strip('\n').strip() for p in poplist2]
-		for i,pop in enumerate(poplist[0]):
-			popdict[i]=pop
-	return popdict
-def readq(qfile):
-	groupdict = {}
-	with open(qfile, 'ru') as qf:
-		qlines= [q.strip('\n').split() for q in qf.readlines()]
-		for q,line in enumerate(qlines):
-			for i,column in enumerate(line):
-				if float(column)>float(0.7):
-					group=i+1
-					break
-				else:
-					group=len(column)+1
-			groupdict[q]=group
-	return groupdict
 
 def admixture(pwd,base,k):
     print "start admixture"
@@ -149,7 +137,7 @@ def admixture(pwd,base,k):
     subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --out %s"%(base,base)))
     ## make this a new function...?
     ## subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --remove %s_outliers.txt --out %s"%(base,base,base)))
-    for x in range(1,k):
+    for x in range(2,k):
         def admixer():
             admixcommand=shlex.split("admixture -j7 -C=0.01 --cv %s.bed %d"%(base,x))
             popen = subprocess.Popen(admixcommand, stdout=subprocess.PIPE, universal_newlines=True)
@@ -168,6 +156,7 @@ def admixture(pwd,base,k):
                 if return_code:
                     raise subprocess.CalledProcessError(return_code, admixcommand)
             print "Admixture: Finished K=%d"%(x)
+            return
         admixer()
     lowest=100
     lowestk="k"
@@ -177,9 +166,41 @@ def admixture(pwd,base,k):
             if float(cvd[key])<lowest:
                 lowest=float(cvd[key])
                 lowestk=key
-    Rplot(admixoutdir,base,"CV")
     print "Best value for K is %s with a CV of %s"%(lowestk,lowest)
     return lowestk
+
+
+def plotadmix(pwd,basename,lowestk):
+    admixoutdir=pwd+"admixture/"
+    os.chdir(admixoutdir)
+    taxdict={}
+    qdict = {}
+    qfile="%s%s.%d.Q"%(admixoutdir,basename,lowestk)
+    Rplot(admixoutdir,basename,"CV")
+    with open("%s%s.nosex"%(pwd,basename),'ru') as ns:
+        nslines=ns.readlines()
+        tlist=[t.strip().split("\t")[0] for t in nslines]
+        for i,taxa in enumerate(tlist):
+			taxdict[i]=taxa
+	with open(qfile, 'ru') as qf:
+		qlines= [q.strip('\n').split() for q in qf.readlines()]
+		for q,line in enumerate(qlines):
+			for i,column in enumerate(line):
+				if float(column)>float(0.7):
+					group=i+1
+					break
+				else:
+					group=len(column)+1
+			qdict[taxdict[q]]=group
+    aoutname="%sassigned.%d.txt"%(admixoutdir,lowestk)
+    with open(aoutname,'w') as aout:
+        aout.write("Sample\tSgroup\n")
+        for key in qdict.keys():
+            aout.write("%s\t%d\n"%(key,qdict[key]))
+    ro.r('aout <- read.table(file="%s",header=TRUE)'%(aoutname))
+    ro.r('am2 <- merge(dat,aout,by.x="Sample",by.y="Sample")')
+    Rplot(admixoutdir,basename,"admix")
+    return
 
 
 def raxer(pwd,basename,bs):
@@ -188,7 +209,6 @@ def raxer(pwd,basename,bs):
     # tree="RAxML_bipartitionsBranchLabels."+basename
     return
 
-
 def cleanup(pwd):
     figpath=pwd+"figures/"
     if not os.path.exists(figpath):
@@ -196,12 +216,13 @@ def cleanup(pwd):
     finpath=pwd+"final/"
     if not os.path.exists(finpath):
         os.mkdir(finpath)
-    for (dirpath, dirnames, filenames) in os.walk(pwd):
-        for file in filenames:
-            # print file
-            ##########FIX
-            if file.endswith("png"):
-                shutil.move(file,figpath)
+    for root, dirs, files in os.walk(pwd):
+        for file in files:
+            path=os.path.join(root,file)
+            if file.endswith("png") and "figures" not in path:
+                shutil.copy(path,figpath)
+            elif "flag" in path and "final" not in paht:
+                shutil.copy(path,finpath)
     return
 
 def controller(pwd,basename,k):
@@ -212,17 +233,19 @@ def controller(pwd,basename,k):
     vcftoplink(pwd,basename,baseo,basep)
     axes=PCAer(pwd,basep)
     Rplot(pwd,basep,axes)
-    admixture(pwd,basep,k)
+    lowestk=admixture(pwd,basep,k)
+    plotadmix(pwd,basep,lowestk)
     cleanup(pwd)
-    pass
+    return
 
 def main():
     # pwd=subprocess.check_output(shlex.split('pwd'))
     #basename = raw_input("Enter basename of VCF file:\n")
     pwd='/Users/josec/Desktop/Trapdoor/pyrad5/7pyrad5_outfiles/PopGenAnalysis/'
     basename="r_7pyrad5"
-
+    datafile="data.txt"
     installtest(pwd)
+    loaddata(pwd,datafile)
     k=10
     bs=50
     controller(pwd,basename,k+1)
