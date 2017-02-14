@@ -44,7 +44,7 @@ def vcftoplink(pwd,basename,baseo,basep):
     print subprocess.check_output(shlex.split("mv %s_temp.map %s.map"%(basename,baseo)))
     ##Prunes the dataset
     subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(baseo)))
-    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --geno 0.9 --mind 0.9 --out %s"%(baseo,basep)))
+    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --geno 0.25 --mind 0.9 --out %s"%(baseo,basep)))
     return
 
 
@@ -61,7 +61,7 @@ def PCAer(pwd,basep):
     familynames:     NO
     grmoutname:      grmjunk
     numthreads:   8
-    lsqproject:	YES
+    lsqproject:    YES
         """%(basep,basep,basep,basep,basep))
     ### add     outliersigmathresh: 7 if you want more outliers
     pcaoutfile=pwd+basep+'_pcaout.txt'
@@ -89,6 +89,7 @@ def PCAer(pwd,basep):
 
 
 def Rplot(pwd,basename,type):
+    admixoutdir=pwd+"admixture/"
     if "PCA" in type[1]:
         ##Merges PCA output and Datafile in R then prints XY plots as PNG in pwd.
         ##Change coloring by searching from col=m2.rx2("XXXX")
@@ -104,7 +105,6 @@ def Rplot(pwd,basename,type):
         grdevices.dev_off()
     elif "CV" in type:
         ##Print CV error plot to determine best K from admixture.
-        admixoutdir=pwd+"admixture/"
         ro.r('cvs <- read.table(file="cv.txt",header=FALSE)')
         cvs=ro.r['cvs']
         grdevices.png(file="%s/CVplot.png"%(pwd), width=1000, height=1000)
@@ -112,13 +112,16 @@ def Rplot(pwd,basename,type):
         grdevices.dev_off()
         os.chdir(pwd)
     elif "admix" in type:
+        ro.r('palette(sample(rainbow(10)))')
+        ro.r('evec <- read.table(file="%s%s.evec")'%(pwd,basename))
+        ro.r('am2 <- merge(am2,evec,all.x=TRUE,by.x="Sample",by.y="V1")')
         am2=ro.r['am2']
-        grdevices.png(file="%s%s_MAP_AdmixGroup.png"%(pwd,basename), width=1000, height=1000)
+        grdevices.png(file="%s%s_MAP_AdmixGroup.png"%(admixoutdir,basename), width=1000, height=1000)
         rplot(am2.rx2("LON"),am2.rx2("LAT"),col=am2.rx2("Sgroup"),main="%s_MAP_AdmixGroup"%(basename),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
         grdevices.dev_off()
-        # grdevices.png(file="%s%s_PCA_COI.png"%(pwd,basename), width=1000, height=1000)
-        # rplot(am2.rx2("V2"),am2.rx2("V3"),col=am2.rx2("Sgroup"),main="%s_PCA_COI"%(basename),ylab=type[1],xlab=type[0],pch=20,cex=2,)
-        # grdevices.dev_off()`
+        grdevices.png(file="%s%s_PCA_AdmixGroup.png"%(admixoutdir,basename), width=1000, height=1000)
+        rplot(am2.rx2("V2"),am2.rx2("V3"),col=am2.rx2("Sgroup"),main="%s_PCA_COI"%(basename),ylab=type[1],xlab=type[0],pch=20,cex=2,)
+        grdevices.dev_off()
     return
 
 
@@ -177,21 +180,21 @@ def plotadmix(pwd,basename,lowestk):
     qdict = {}
     qfile="%s%s.%d.Q"%(admixoutdir,basename,lowestk)
     Rplot(admixoutdir,basename,"CV")
-    with open("%s%s.nosex"%(pwd,basename),'ru') as ns:
+    with open("%s%s.fam"%(admixoutdir,basename),'ru') as ns:
         nslines=ns.readlines()
-        tlist=[t.strip().split("\t")[0] for t in nslines]
+        tlist=[t.strip().split(" ")[0] for t in nslines]
         for i,taxa in enumerate(tlist):
-			taxdict[i]=taxa
-	with open(qfile, 'ru') as qf:
-		qlines= [q.strip('\n').split() for q in qf.readlines()]
-		for q,line in enumerate(qlines):
-			for i,column in enumerate(line):
-				if float(column)>float(0.7):
-					group=i+1
-					break
-				else:
-					group=len(column)+1
-			qdict[taxdict[q]]=group
+            taxdict[i]=taxa
+    with open(qfile, 'ru') as qf:
+        qlines= [q.strip('\n').split() for q in qf.readlines()]
+        for q,line in enumerate(qlines):
+            for i,column in enumerate(line):
+                if float(column)>float(0.7):
+                    group=i+1
+                    break
+                else:
+                    group=len(column)+1
+            qdict[taxdict[q]]=group
     aoutname="%sassigned.%d.txt"%(admixoutdir,lowestk)
     with open(aoutname,'w') as aout:
         aout.write("Sample\tSgroup\n")
@@ -199,7 +202,7 @@ def plotadmix(pwd,basename,lowestk):
             aout.write("%s\t%d\n"%(key,qdict[key]))
     ro.r('aout <- read.table(file="%s",header=TRUE)'%(aoutname))
     ro.r('am2 <- merge(dat,aout,by.x="Sample",by.y="Sample")')
-    Rplot(admixoutdir,basename,"admix")
+    Rplot(pwd,basename,"admix")
     return
 
 
@@ -234,7 +237,9 @@ def controller(pwd,basename,k):
     axes=PCAer(pwd,basep)
     Rplot(pwd,basep,axes)
     lowestk=admixture(pwd,basep,k)
+    # lowestk=5
     plotadmix(pwd,basep,lowestk)
+    ro.r("write.table(am2, file='%smergeddata.txt', quote=FALSE, row.names=FALSE, sep='\t')"%(pwd))
     cleanup(pwd)
     return
 
@@ -246,7 +251,7 @@ def main():
     datafile="data.txt"
     installtest(pwd)
     loaddata(pwd,datafile)
-    k=10
+    k=5
     bs=50
     controller(pwd,basename,k+1)
     # raxer(pwd,basename,bs)
