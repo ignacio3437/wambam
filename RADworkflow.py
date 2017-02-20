@@ -27,7 +27,7 @@ def installtest(pwd):
 def loaddata(pwd,datafile):
     ###Datafile must be tsv with headers: Samples, LAT, LON, COI[_cor]
     ro.r('dat <- read.table(file="%s%s",header=TRUE)'%(pwd,datafile))
-    ##Friendly random color palette!
+    ### Friendly random color palette!
     ro.r("""palette(c('#8dd3c7','#ffffb3','#bebada',
     '#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5',
     '#d9d9d9','#bc80bd','#ccebc5','#ffed6f','black',
@@ -44,7 +44,7 @@ def vcftoplink(pwd,basename,baseo,basep):
     print subprocess.check_output(shlex.split("mv %s_temp.map %s.map"%(basename,baseo)))
     ##Prunes the dataset
     subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(baseo)))
-    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --geno 0.25 --mind 0.9 --out %s"%(baseo,basep)))
+    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --geno 0.9 --mind 0.9 --maf 0.05 --out %s"%(baseo,basep)))
     return
 
 
@@ -56,7 +56,7 @@ def PCAer(pwd,basep):
     indivname:       %s.ped
     evecoutname:     %s.evec
     evaloutname:     %s.eval
-    altnormstyle:    NO
+    altnormstyle:    YES
     numoutevec:      2
     familynames:     NO
     grmoutname:      grmjunk
@@ -98,10 +98,11 @@ def Rplot(pwd,basename,type):
         dat=ro.r['dat']
         m2=ro.r['m2']
         grdevices.png(file="%s%s_MAP_COI.png"%(pwd,basename), width=1000, height=1000)
-        rplot(m2.rx2("LON"),m2.rx2("LAT"),col=m2.rx2("COI_5p"),main="%s_MAP_COI"%(basename),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
+        rplot(m2.rx2("LON"),m2.rx2("LAT"),col=m2.rx2("COI_13"),main="%s_MAP_COI"%(basename),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
+        # ro.r('text(m2$LON,m2$LAT,m2$Sample,cex=0.8)')
         grdevices.dev_off()
         grdevices.png(file="%s%s_PCA_COI.png"%(pwd,basename), width=1000, height=1000)
-        rplot(m2.rx2("V2"),m2.rx2("V3"),col=m2.rx2("COI_5p"),main="%s_PCA_COI"%(basename),ylab=type[1],xlab=type[0],pch=20,cex=2,)
+        rplot(m2.rx2("V2"),m2.rx2("V3"),col=m2.rx2("COI_13"),main="%s_PCA_COI"%(basename),ylab=type[1],xlab=type[0],pch=20,cex=2,)
         grdevices.dev_off()
     elif "CV" in type:
         ##Print CV error plot to determine best K from admixture.
@@ -140,7 +141,7 @@ def admixture(pwd,base,k):
     subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --out %s"%(base,base)))
     ## make this a new function...?
     ## subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --remove %s_outliers.txt --out %s"%(base,base,base)))
-    for x in range(2,k):
+    for x in range(1,k):
         def admixer():
             admixcommand=shlex.split("admixture -j7 -C=0.01 --cv %s.bed %d"%(base,x))
             popen = subprocess.Popen(admixcommand, stdout=subprocess.PIPE, universal_newlines=True)
@@ -189,7 +190,7 @@ def plotadmix(pwd,basename,lowestk):
         qlines= [q.strip('\n').split() for q in qf.readlines()]
         for q,line in enumerate(qlines):
             for i,column in enumerate(line):
-                if float(column)>float(0.7):
+                if float(column)>float(0.5):
                     group=i+1
                     break
                 else:
@@ -237,7 +238,7 @@ def controller(pwd,basename,k):
     axes=PCAer(pwd,basep)
     Rplot(pwd,basep,axes)
     lowestk=admixture(pwd,basep,k)
-    # lowestk=5
+    # lowestk=2
     plotadmix(pwd,basep,lowestk)
     ro.r("write.table(am2, file='%smergeddata.txt', quote=FALSE, row.names=FALSE, sep='\t')"%(pwd))
     cleanup(pwd)
@@ -246,13 +247,13 @@ def controller(pwd,basename,k):
 def main():
     # pwd=subprocess.check_output(shlex.split('pwd'))
     #basename = raw_input("Enter basename of VCF file:\n")
-    pwd='/Users/josec/Desktop/Trapdoor/pyrad5/7pyrad5_outfiles/PopGenAnalysis/'
-    basename="r_7pyrad5"
+    pwd='/Users/josec/Desktop/Trapdoor/freshstart/red/red_outfiles/'
+    basename="red"
     datafile="data.txt"
-    installtest(pwd)
+    # installtest(pwd)
     loaddata(pwd,datafile)
     k=5
-    bs=50
+    bs=10
     controller(pwd,basename,k+1)
     # raxer(pwd,basename,bs)
     print "ALLDone"
