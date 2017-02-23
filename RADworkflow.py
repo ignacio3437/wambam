@@ -64,7 +64,7 @@ def PCAer(pwd,basep):
     lsqproject:    YES
         """%(basep,basep,basep,basep,basep))
     ### add     outliersigmathresh: 7 if you want more outliers
-    pcaoutfile=pwd+basep+'_pcaout.txt'
+    pcaoutfile=pwd+basep+'_pcaoutI.txt'
     pcaout=subprocess.check_output(shlex.split("smartpca -p pca.par"))
     with open(pcaoutfile,'w') as pcaoutfile:
         pcaoutfile.write(pcaout)
@@ -81,7 +81,7 @@ def PCAer(pwd,basep):
         outliers=re.findall(r'REMOVED outlier (\w*)',pcaout)
     else:
         outliers=[]
-    with open(pwd+basep+'_outliers.txt', 'w') as outlierfile:
+    with open(pwd+basep+'_outliersI.txt', 'w') as outlierfile:
         for outlier in outliers:
             outlierfile.write(outlier+'\t'+outlier+'\n')
     print "There are %d outliers in PCA analysis of %s"%(len(outliers),basep)
@@ -97,12 +97,12 @@ def Rplot(pwd,basename,type):
         ro.r('m2 <- merge(dat,evec,by.x="Sample",by.y="V1")')
         dat=ro.r['dat']
         m2=ro.r['m2']
-        grdevices.png(file="%s%s_MAP_COI.png"%(pwd,basename), width=1000, height=1000)
+        grdevices.png(file="%s%s_MAP_CO1.png"%(pwd,basename), width=1000, height=1000)
         rplot(m2.rx2("LON"),m2.rx2("LAT"),col=m2.rx2("COI_both"),main="%s_MAP_COI"%(basename.strip("_p")),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
         ### Add labels
         # ro.r('text(m2$LON,m2$LAT,m2$Sample,cex=0.8)')
         grdevices.dev_off()
-        grdevices.png(file="%s%s_PCA_COI.png"%(pwd,basename), width=1000, height=1000)
+        grdevices.png(file="%s%s_PCA_CO1.png"%(pwd,basename), width=1000, height=1000)
         rplot(m2.rx2("V2"),m2.rx2("V3"),col=m2.rx2("COI_both"),main="%s_PCA_COI"%(basename.strip("_p")),ylab=type[1],xlab=type[0],pch=20,cex=2,)
         grdevices.dev_off()
     elif "CV" in type:
@@ -136,17 +136,20 @@ def admixture(pwd,base,k):
         os.mkdir(admixoutdir)
     shutil.copy(base+".map",admixoutdir)
     shutil.copy(base+".ped",admixoutdir)
-    shutil.copy(base+"_outliers.txt",admixoutdir)
+    shutil.copy(base+"_outliersI.txt",admixoutdir)
     shutil.copy("data.txt",admixoutdir)
     os.chdir(admixoutdir)
     subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --out %s"%(base,base)))
+    shutil.copy("%s.bed"%(base),"%sI.bed"%(base))
+    shutil.copy("%s.bim"%(base),"%sI.bim"%(base))
+
     ## make this a new function...?
-    ## subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --remove %s_outliers.txt --out %s"%(base,base,base)))
+    ## subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --remove %s_outliersI.txt --out %s"%(base,base,base)))
     for x in range(1,k):
         def admixer():
             admixcommand=shlex.split("admixture -j7 -C=0.01 --cv %s.bed %d"%(base,x))
             popen = subprocess.Popen(admixcommand, stdout=subprocess.PIPE, universal_newlines=True)
-            with open(admixoutdir+"admixout.txt",'a') as admixoutfile:
+            with open(admixoutdir+"admixoutI.txt",'a') as admixoutfile:
                 admixoutfile.write("####################K=%s\n####################\n"%(x))
                 for stdout_line in iter(popen.stdout.readline, ""):
                     # print stdout_line
@@ -218,7 +221,7 @@ def cleanup(pwd):
     figpath=pwd+"figures/"
     if not os.path.exists(figpath):
         os.mkdir(figpath)
-    finpath=pwd+"final/"
+    finpath=pwd+"Analysis/"
     if not os.path.exists(finpath):
         os.mkdir(finpath)
     for root, dirs, files in os.walk(pwd):
@@ -226,7 +229,7 @@ def cleanup(pwd):
             path=os.path.join(root,file)
             if file.endswith("png") and "figures" not in path:
                 shutil.copy(path,figpath)
-            elif "flag" in path and "final" not in paht:
+            elif "I." in path and "Analysis" not in path:
                 shutil.copy(path,finpath)
     return
 
@@ -241,7 +244,7 @@ def controller(pwd,basename,k):
     lowestk=admixture(pwd,basep,k)
     # lowestk=4
     plotadmix(pwd,basep,lowestk)
-    ro.r("write.table(am2, file='%smergeddata.txt', quote=FALSE, row.names=FALSE, sep='\t')"%(pwd))
+    ro.r("write.table(am2, file='%smergeddataI.txt', quote=FALSE, row.names=FALSE, sep='\t')"%(pwd))
     cleanup(pwd)
     return
 
