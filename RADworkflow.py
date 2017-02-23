@@ -7,7 +7,6 @@ from pandas import *
 from rpy2.robjects.packages import importr
 import rpy2.robjects as ro
 grdevices = importr('grDevices')
-rprint = ro.globalenv.get("print")
 rplot=ro.r('plot')
 
 
@@ -27,11 +26,12 @@ def installtest(pwd):
 def loaddata(pwd,datafile):
     ###Datafile must be tsv with headers: Samples, LAT, LON, COI[_cor]
     ro.r('dat <- read.table(file="%s%s",header=TRUE)'%(pwd,datafile))
-    ### Friendly random color palette!
+    ### Friendly random 18 color palette!
     ro.r("""palette(c('#8dd3c7','#ffffb3','#bebada',
-    '#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5',
-    '#d9d9d9','#bc80bd','#ccebc5','#ffed6f','black',
-    'forestgreen','brown','deeppink'))""")
+          '#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5',
+          '#d9d9d9','#bc80bd','#ccebc5','#ffed6f','black',
+          'forestgreen','brown','deeppink','darkblue',
+          'wheat'))""")
     return
 
 
@@ -44,7 +44,7 @@ def vcftoplink(pwd,basename,baseo,basep):
     print subprocess.check_output(shlex.split("mv %s_temp.map %s.map"%(basename,baseo)))
     ##Prunes the dataset
     subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(baseo)))
-    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --geno 0.9 --mind 0.9 --maf 0.05 --out %s"%(baseo,basep)))
+    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --geno 0.90 --mind 0.9 --maf 0.05 --out %s"%(baseo,basep)))
     return
 
 
@@ -98,18 +98,19 @@ def Rplot(pwd,basename,type):
         dat=ro.r['dat']
         m2=ro.r['m2']
         grdevices.png(file="%s%s_MAP_COI.png"%(pwd,basename), width=1000, height=1000)
-        rplot(m2.rx2("LON"),m2.rx2("LAT"),col=m2.rx2("COI_13"),main="%s_MAP_COI"%(basename),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
+        rplot(m2.rx2("LON"),m2.rx2("LAT"),col=m2.rx2("COI_both"),main="%s_MAP_COI"%(basename.strip("_p")),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
+        ### Add labels
         # ro.r('text(m2$LON,m2$LAT,m2$Sample,cex=0.8)')
         grdevices.dev_off()
         grdevices.png(file="%s%s_PCA_COI.png"%(pwd,basename), width=1000, height=1000)
-        rplot(m2.rx2("V2"),m2.rx2("V3"),col=m2.rx2("COI_13"),main="%s_PCA_COI"%(basename),ylab=type[1],xlab=type[0],pch=20,cex=2,)
+        rplot(m2.rx2("V2"),m2.rx2("V3"),col=m2.rx2("COI_both"),main="%s_PCA_COI"%(basename.strip("_p")),ylab=type[1],xlab=type[0],pch=20,cex=2,)
         grdevices.dev_off()
     elif "CV" in type:
         ##Print CV error plot to determine best K from admixture.
         ro.r('cvs <- read.table(file="cv.txt",header=FALSE)')
         cvs=ro.r['cvs']
         grdevices.png(file="%s/CVplot.png"%(pwd), width=1000, height=1000)
-        rplot(cvs.rx2("V1"),cvs.rx2("V2"),main="CVplot",ylab="CVeror",xlab="K",pch=20,cex=1.5)
+        rplot(cvs.rx2("V1"),cvs.rx2("V2"),main="CVplot_%s"%(basename.strip("_p")),ylab="CVeror",xlab="K",pch=20,cex=1.5)
         grdevices.dev_off()
         os.chdir(pwd)
     elif "admix" in type:
@@ -118,10 +119,10 @@ def Rplot(pwd,basename,type):
         ro.r('am2 <- merge(am2,evec,all.x=TRUE,by.x="Sample",by.y="V1")')
         am2=ro.r['am2']
         grdevices.png(file="%s%s_MAP_AdmixGroup.png"%(admixoutdir,basename), width=1000, height=1000)
-        rplot(am2.rx2("LON"),am2.rx2("LAT"),col=am2.rx2("Sgroup"),main="%s_MAP_AdmixGroup"%(basename),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
+        rplot(am2.rx2("LON"),am2.rx2("LAT"),col=am2.rx2("Sgroup"),main="%s_MAP_AdmixGroup"%(basename.strip("_p")),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
         grdevices.dev_off()
         grdevices.png(file="%s%s_PCA_AdmixGroup.png"%(admixoutdir,basename), width=1000, height=1000)
-        rplot(am2.rx2("V2"),am2.rx2("V3"),col=am2.rx2("Sgroup"),main="%s_PCA_COI"%(basename),ylab=type[1],xlab=type[0],pch=20,cex=2,)
+        rplot(am2.rx2("V2"),am2.rx2("V3"),col=am2.rx2("Sgroup"),main="%s_PCA_COI"%(basename.strip("_p")),ylab=type[1],xlab=type[0],pch=20,cex=2,)
         grdevices.dev_off()
     return
 
@@ -233,12 +234,12 @@ def controller(pwd,basename,k):
     baseo='%s_o'%(basename)
     basep='%s_p'%(basename)
     pcafile='%s%s.evec'%(pwd,basename)
-    ##Comment out steps to skip them. PCAer() and Rplot() need to be run together
+    # ##Comment out steps to skip them. PCAer() and Rplot() need to be run together
     vcftoplink(pwd,basename,baseo,basep)
     axes=PCAer(pwd,basep)
     Rplot(pwd,basep,axes)
     lowestk=admixture(pwd,basep,k)
-    # lowestk=2
+    # lowestk=4
     plotadmix(pwd,basep,lowestk)
     ro.r("write.table(am2, file='%smergeddata.txt', quote=FALSE, row.names=FALSE, sep='\t')"%(pwd))
     cleanup(pwd)
@@ -247,15 +248,15 @@ def controller(pwd,basename,k):
 def main():
     # pwd=subprocess.check_output(shlex.split('pwd'))
     #basename = raw_input("Enter basename of VCF file:\n")
-    pwd='/Users/josec/Desktop/Trapdoor/freshstart/red/red_outfiles/'
-    basename="red"
+    pwd='/Users/josec/Desktop/Trapdoor/freshstart/rb/rb_90_outfiles/'
+    basename="rb_90"
     datafile="data.txt"
     # installtest(pwd)
     loaddata(pwd,datafile)
-    k=5
+    k=10
     bs=10
     controller(pwd,basename,k+1)
-    # raxer(pwd,basename,bs)
+    raxer(pwd,basename,bs)
     print "ALLDone"
     return
 
