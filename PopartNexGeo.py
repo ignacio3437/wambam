@@ -11,20 +11,20 @@ This script takes an input of a directory with tsv files and a directory of nexu
  "Pop"
  "Lat Dec"
  "Long Dec"
- 
+
 The Seq cell in tsv must match sequence in nexus exactly. A waring will come up for sequences that don't match.
-The --pop flag will create a new nexus file that is ready to load into PopArt. This option requires lat lon data in decimal format. Sequences will be grouped by each area specified in the tsv under the  "Pop" column. 
+The --pop flag will create a new nexus file that is ready to load into PopArt. This option requires lat lon data in decimal format. Sequences will be grouped by each area specified in the tsv under the  "Pop" column.
 The groups will be sorted from west to east.
 
 A count file will be written to the popout/dir. This file keeps a tally how many samples are in the nexus file compared to the tsv input file.
 
 To clean up the nexus file enable the --nexcleanup option:
-This will rename all of the sequences to only contain the first part of the name containing alpha-numerics and cut off everything else (like all of the stuff that Geneious appends to sequence names.) 
-The new cleaned nexus files will be saved to the cleannex/dir and used to make the new output files. 
-Example: 
-WAMS70039_consensussequence ----> WAMS70039
-'WAMS98545(reversed)' ----> WAMS98545
-'WAMS98546 ' ----> WAMS98546
+This will rename all of the sequences to only contain the first part of the name containing alpha-numerics and cut off everything else (like all of the stuff that Geneious appends to sequence names.)
+The new cleaned nexus files will be saved to the cleannex/dir and used to make the new output files.
+Example:
+'WAMS70039_consensussequence' ----> 'WAMS70039'
+'WAMS98545(reversed)' ----> 'WAMS98545'
+'WAMS98546 ' ----> 'WAMS98546'
 
 """
 
@@ -32,7 +32,7 @@ def grabdir(dir):
 	#pull out the sheets in the directory and make a list of the files and taxa for each file
 	filenames= os.listdir(dir)
 	tsvs=[]
-	taxalist = []
+	taxalist=[]
 	for file in filenames:
 		if '.tsv' in file:
 			tsvs.append(os.path.join(dir,file))
@@ -42,7 +42,7 @@ def grabdir(dir):
 def tsvparser(tsv):
 #returns wamdict with keys = subsamples
 #subsample['loc']=location
-#need: loc, lat, lon 
+#need: loc, lat, lon
 	f = open(tsv, 'rU')
 	wamdict={}
 	gpsdict={}
@@ -75,13 +75,13 @@ def tsvparser(tsv):
 		except:
 			pass
 	return wamdict, gpsdict
-	
+
 def seqlistmaker(nex):
 	#return the names of the sequences in nexus file
 	f=open(nex,'rU')
 	seqlist=[]
 	NTAX_PATTERN = re.compile(r"""taxlabels""", re.IGNORECASE)
-	NAME_PATTERN = re.compile(r"""[^[\n\t]+""")
+	NAME_PATTERN = re.compile(r"""[^[\n\t]+]""")
 	lines=f.readlines()
 	for i,l in enumerate(lines):
 		ntax=re.search(NTAX_PATTERN,l)
@@ -93,12 +93,12 @@ def seqlistmaker(nex):
 				seqlist.append(name)
 				i+=1
 	return seqlist
-	
+
 def nexuscleanuper(nexfiles, cleanup):
 	#pull out the sheets in the directory and make a list of the files and taxa for each file
 	NTAX_PATTERN = re.compile(r"""taxlabels""", re.IGNORECASE)
 	NAME_PATTERN = re.compile(r"""[A-Za-z0-9]+""")
-	OLDNAME_PATTERN = re.compile(r"""[^[\n\t]+""")
+	OLDNAME_PATTERN = re.compile(r"""[^[\n\t]+]""")
 	for nex in nexfiles:
 		print nex
 		f=open(nex,'rU')
@@ -135,13 +135,13 @@ def subseqparser(subsamples,nex):
 		if seq not in rsubsam:
 			print 'WARNING: %s is in %s but not in tsv sheet.'%(seq,os.path.basename(nex))
 	return rsubsam
-	
+
 def nexfinder(nex):
 	nexlist = nex.split('/')
 	for x in nexlist:
 		if '.nex' in x:
 			return x.replace('.nex','')
-		
+
 def counter(rsubsamples,nsubsamples,gpsdict,wamdict,nexname,outf):
 	locs=[]
 	seqeddict={}
@@ -203,7 +203,7 @@ def main():
 				for i,x in enumerate(globalGPSdict.items()):
 					if x[1][1] ==sl:
 						if globalGPSdict.keys()[i] not in sortedgps:
-							sortedgps.append(globalGPSdict.keys()[i])	
+							sortedgps.append(globalGPSdict.keys()[i])
 			#Make header(popblock) for nexus file:
 			block1="""
 Begin GeoTags;
@@ -224,7 +224,7 @@ Format labels=yes separator=Spaces;
 					nsubsamples=[]
 					for sub in subsamples:
 						if sub not in  rsubsamples:
-							nsubsamples.append(sub)	
+							nsubsamples.append(sub)
 					counter(rsubsamples,nsubsamples,gpsdict,wamdict,nexname,outc)
 					popoutfile= popout+'/'+os.path.basename(nex).rstrip('nex')
 					rareas=[]
@@ -241,7 +241,7 @@ Format labels=yes separator=Spaces;
 					Lons=[globalGPSdict[x][1] for x in rsortedgps]
 					block3="ClustLatitude %s;\nClustLongitude %s;\nClustLabels %s;\nMatrix\n"%(' '.join(Lats),' '.join(Lons),' '.join(rsortedgps))
 					popblock= block1+block2+block3
-					
+
 					outf= open(popoutfile+'nex', 'w')
 					inf = open(nex,'rU')
 					inlines= inf.read()
@@ -255,6 +255,3 @@ Format labels=yes separator=Spaces;
 					outf.close()
 if __name__ == '__main__':
 	main()
-	
-	
-	
