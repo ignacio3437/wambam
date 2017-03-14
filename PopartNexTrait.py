@@ -10,18 +10,18 @@ This does the same as WAMsheetParseGeo.py but does not need lat lon data.
 This script takes an input of a directory with tsv files and a directory of nexus alignments. The tsv files can have any info. Header line of tsvs MUST have the following columns:
  "Seq"
  "Pop"
- 
- 
+
+
 The Seq cell in tsv must match sequence in nexus exactly. A waring will come up for sequences that don't match.
-The --pop flag will create a new nexus file that is ready to load into PopArt. Sequences will be grouped by each area specified in the tsv under the  "Pop" column. 
+The --pop flag will create a new nexus file that is ready to load into PopArt. Sequences will be grouped by each area specified in the tsv under the  "Pop" column.
 
 
 A count file will be written to the popout/dir. This file keeps a tally how many samples are in the nexus file compared to the tsv input file.
 
 To clean up the nexus file enable the --nexcleanup option:
-This will rename all of the sequences to only contain the first part of the name containing alpha-numerics and cut off everything else (like all of the stuff that Geneious appends to sequence names.) 
-The new cleaned nexus files will be saved to the cleannex/dir and used to make the new output files. 
-Example: 
+This will rename all of the sequences to only contain the first part of the name containing alpha-numerics and cut off everything else (like all of the stuff that Geneious appends to sequence names.)
+The new cleaned nexus files will be saved to the cleannex/dir and used to make the new output files.
+Example:
 WAMS70039_consensussequence ----> WAMS70039
 'WAMS98545(reversed)' ----> WAMS98545
 'WAMS98546 ' ----> WAMS98546
@@ -63,13 +63,13 @@ def tsvparser(tsv):
 		except:
 			pass
 	return wamdict
-	
+
 def seqlistmaker(nex):
 	#return the names of the sequences in nexus file
 	f=open(nex,'rU')
 	seqlist=[]
 	NTAX_PATTERN = re.compile(r"""taxlabels""", re.IGNORECASE)
-	NAME_PATTERN = re.compile(r"""[^[\n\t]+""")
+	NAME_PATTERN = re.compile(r"""[^\[\n\t]+""")
 	lines=f.readlines()
 	for i,l in enumerate(lines):
 		ntax=re.search(NTAX_PATTERN,l)
@@ -81,12 +81,12 @@ def seqlistmaker(nex):
 				seqlist.append(name)
 				i+=1
 	return seqlist
-	
+
 def nexuscleanuper(nexfiles, cleanup):
 	#pull out the sheets in the directory and make a list of the files and taxa for each file
 	NTAX_PATTERN = re.compile(r"""taxlabels""", re.IGNORECASE)
 	NAME_PATTERN = re.compile(r"""[A-Za-z0-9]+""")
-	OLDNAME_PATTERN = re.compile(r"""[^[\n\t]+""")
+	OLDNAME_PATTERN = re.compile(r"""[^\[\n\t]+""")
 	for nex in nexfiles:
 		f=open(nex,'rU')
 		filestring=f.read()
@@ -122,13 +122,13 @@ def subseqparser(subsamples,nex):
 		if seq not in rsubsam:
 			print 'WARNING: %s is in %s but not in tsv sheet.'%(seq,os.path.basename(nex))
 	return rsubsam
-	
+
 def nexfinder(nex):
 	nexlist = nex.split('/')
 	for x in nexlist:
 		if '.nex' in x:
 			return x.replace('.nex','')
-		
+
 def counter(rsubsamples,nsubsamples,wamdict,nexname, outc):
 	locs=[]
 	seqeddict={}
@@ -147,7 +147,7 @@ def counter(rsubsamples,nsubsamples,wamdict,nexname, outc):
 	for l in locations:
 		outc.write(nexname+'\t'+l+'\t'+str(seqeddict[l])+'\t'+str(notseqdict[l])+'\n')
 	return seqlocations
-	
+
 def traitmaker(seqlocations):
 	numlocs= len(seqlocations)
 	traitkey={}
@@ -210,7 +210,7 @@ Format labels=yes separator=Comma;
 				nsubsamples=[]
 				for sub in subsamples:
 					if sub not in  rsubsamples:
-						nsubsamples.append(sub)	
+						nsubsamples.append(sub)
 				seqlocations = counter(rsubsamples,nsubsamples,wamdict,nexname,outc)
 				traitkey=traitmaker(seqlocations)
 				popoutfile= popout+'/'+os.path.basename(nex).rstrip('nex')
@@ -229,6 +229,3 @@ Format labels=yes separator=Comma;
 				outf.close()
 if __name__ == '__main__':
 	main()
-	
-	
-	
