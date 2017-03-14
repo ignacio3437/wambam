@@ -6,11 +6,14 @@ from collections import Counter
 usage= """
 usage: WAMsheetParseGeo.py --dir dir/w/tsvs --nex dir/w/nexus/gene/algn --pop popout/dir [--nexcleanup cleannex/dir]
 
+See PopartTemplate.tsv
 This script takes an input of a directory with tsv files and a directory of nexus alignments. The tsv files can have any info. Header line of tsvs MUST have the following columns:
  "Seq"
  "Pop"
- "Lat Dec"
- "Long Dec"
+ "LAT"
+ "LON"
+
+ All Pop designations must have a unique LAT LON.
 
 The Seq cell in tsv must match sequence in nexus exactly. A waring will come up for sequences that don't match.
 The --pop flag will create a new nexus file that is ready to load into PopArt. This option requires lat lon data in decimal format. Sequences will be grouped by each area specified in the tsv under the  "Pop" column.
@@ -37,6 +40,9 @@ def grabdir(dir):
 		if '.tsv' in file:
 			tsvs.append(os.path.join(dir,file))
 			taxalist.append(file.replace('.tsv', ''))
+        if '.txt' in file:
+			tsvs.append(os.path.join(dir,file))
+			taxalist.append(file.replace('.txt', ''))
 	return tsvs,taxalist
 
 def tsvparser(tsv):
@@ -52,8 +58,8 @@ def tsvparser(tsv):
 			headerlist= line.rstrip('\r\n').split('\t')
 			wami=headerlist.index('Seq')
 			areai= headerlist.index('Pop')
-			lati=headerlist.index('Lat Dec')
-			loni=headerlist.index('Long Dec')
+			lati=headerlist.index('LAT')
+			loni=headerlist.index('LON')
 		try:
 			if 'Seq' in line:
 				continue
@@ -81,7 +87,7 @@ def seqlistmaker(nex):
 	f=open(nex,'rU')
 	seqlist=[]
 	NTAX_PATTERN = re.compile(r"""taxlabels""", re.IGNORECASE)
-	NAME_PATTERN = re.compile(r"""[^[\n\t]+]""")
+	NAME_PATTERN = re.compile(r"""[^\[\n\t]+""")
 	lines=f.readlines()
 	for i,l in enumerate(lines):
 		ntax=re.search(NTAX_PATTERN,l)
@@ -98,7 +104,7 @@ def nexuscleanuper(nexfiles, cleanup):
 	#pull out the sheets in the directory and make a list of the files and taxa for each file
 	NTAX_PATTERN = re.compile(r"""taxlabels""", re.IGNORECASE)
 	NAME_PATTERN = re.compile(r"""[A-Za-z0-9]+""")
-	OLDNAME_PATTERN = re.compile(r"""[^[\n\t]+]""")
+	OLDNAME_PATTERN = re.compile(r"""[^\[\n\t]+""")
 	for nex in nexfiles:
 		print nex
 		f=open(nex,'rU')
@@ -133,7 +139,7 @@ def subseqparser(subsamples,nex):
 			rsubsam.append(sub)
 	for seq in seqlist:
 		if seq not in rsubsam:
-			print 'WARNING: %s is in %s but not in tsv sheet.'%(seq,os.path.basename(nex))
+			print 'WARNING: %s is in %s but not in sheet.'%(seq,os.path.basename(nex))
 	return rsubsam
 
 def nexfinder(nex):
