@@ -12,24 +12,20 @@ rplot=ro.r('plot')
 
 def installtest(pwd):
     os.chdir(pwd)
-    subprocess.check_output(shlex.split("smartpca -v"),stdout=open(os.devnull,'wb'))
-    subprocess.check_output(shlex.split("vcftools"),stdout=open(os.devnull,'wb'))
-    subprocess.check_output(shlex.split("raxmlHPC-PTHREADS-SSE3 -v"),stdout=open(os.devnull,'wb'))
-    subprocess.check_output(shlex.split("r --version"),stdout=open(os.devnull,'wb'))
-    subprocess.check_output(shlex.split("ipyrad --version"),stdout=open(os.devnull,'wb'))
-    subprocess.check_output(shlex.split("admixture --help"),stdout=open(os.devnull,'wb'))
-    subprocess.check_output(shlex.split("plink2 --version"),stdout=open(os.devnull,'wb'))
+    subprocess.check_output(shlex.split("smartpca -v"))
+    subprocess.check_output(shlex.split("vcftools"))
+    subprocess.check_output(shlex.split("raxmlHPC-PTHREADS-SSE3 -v"))
+    subprocess.check_output(shlex.split("r --version"))
+    subprocess.check_output(shlex.split("ipyrad --version"))
+    subprocess.check_output(shlex.split("admixture --help"))
+    subprocess.check_output(shlex.split("plink2 --version"))
     print "All programs installed"
     return
 
 
 def loaddata(pwd,datafile):
     ###Datafile must be tsv with headers: Samples, LAT, LON, COI[_cor]
-    try:
-        subprocess.check_output(shlex.split("ln /Users/josec/Desktop/Trapdoor/freshstart/data.txt %s%s"%(pwd,datafile)))
-    except:
-        pass
-    ro.r('dat <- read.table(file="%s%s",header=TRUE)'%(pwd,datafile))
+    ro.r('dat <- read.table(file="%s%s",header=TRUE,sep="\t")'%(pwd,datafile))
     ### Friendly random 18 color palette!
     ro.r("""palette(c('#8dd3c7','#ffffb3','#bebada',
           '#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5',
@@ -41,7 +37,7 @@ def loaddata(pwd,datafile):
 
 def vcftoplink(pwd,basename,baseo,basep):
     os.chdir(pwd)
-    subprocess.check_output(shlex.split("vcftools --vcf %s.vcf --out %s --plink"%(basename,baseo)),stdout=open(os.devnull,'wb'))
+    vcfoutput=subprocess.check_output(shlex.split("vcftools --vcf %s.vcf --out %s --plink"%(basename,baseo)))
     ##changes the chromosome all of the SNP to chromosome 1 for forward compatibility with structure like programs.
     with open("%s_temp.map"%(basename),"w") as outfile:
         subprocess.call(shlex.split("awk '$1=1' %s.map"%(baseo)),stdout=outfile)
@@ -255,12 +251,12 @@ def controller(pwd,basename,k):
 def main():
     # pwd=subprocess.check_output(shlex.split('pwd'))
     #basename = raw_input("Enter basename of VCF file:\n")
-    pwd='/Users/josec/Desktop/Trapdoor/freshstart/rb/west_90c_10m_outfiles/'
-    basename="west_90c_10m"
+    pwd='/Users/josec/Desktop/Trapdoor/freshstart/rb/rb_outfiles/'
+    basename="rb"
     datafile="data.txt"
     # installtest(pwd)
     loaddata(pwd,datafile)
-    k=10
+    k=1
     bs=10
     controller(pwd,basename,k+1)
     raxer(pwd,basename,bs)
