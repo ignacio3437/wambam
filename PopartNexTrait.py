@@ -2,7 +2,6 @@
 
 import os,sys,re
 from collections import Counter
-
 usage= """
 usage: WAMsheetParseTrait.py --dir dir/w/tsvs --nex dir/w/nexus/gene/algn --pop popout/dir [--nexcleanup cleannex/dir]
 This does the same as WAMsheetParseGeo.py but does not need lat lon data.
@@ -11,10 +10,8 @@ This script takes an input of a directory with tsv files and a directory of nexu
  "Seq"
  "Pop"
 
-
 The Seq cell in tsv must match sequence in nexus exactly. A waring will come up for sequences that don't match.
 The --pop flag will create a new nexus file that is ready to load into PopArt. Sequences will be grouped by each area specified in the tsv under the  "Pop" column.
-
 
 A count file will be written to the popout/dir. This file keeps a tally how many samples are in the nexus file compared to the tsv input file.
 
@@ -25,18 +22,19 @@ Example:
 WAMS70039_consensussequence ----> WAMS70039
 'WAMS98545(reversed)' ----> WAMS98545
 'WAMS98546 ' ----> WAMS98546
-
 """
 
 def grabdir(dir):
 	#pull out the sheets in the directory and make a list of the files and taxa for each file
 	filenames= os.listdir(dir)
 	tsvs=[]
-	taxalist = []
+	taxalist=[]
 	for file in filenames:
-		if '.tsv' in file:
+		if '.tsv' or '.txt' in file:
 			tsvs.append(os.path.join(dir,file))
-			taxalist.append(file.replace('.tsv', ''))
+			file=file.replace('.tsv', '')
+			file=file.replace('.txt', '')
+			taxalist.append(file)
 	return tsvs,taxalist
 
 def tsvparser(tsv):
