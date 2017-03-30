@@ -127,7 +127,7 @@ def Rplot(pwd,basename,type):
     return
 
 
-def admixture(pwd,base,k):
+def admixture(pwd,base,k,datafile):
     print "start admixture"
     os.chdir(pwd)
     cvd={}
@@ -137,7 +137,7 @@ def admixture(pwd,base,k):
     shutil.copy(base+".map",admixoutdir)
     shutil.copy(base+".ped",admixoutdir)
     shutil.copy(base+"_outliersI.txt",admixoutdir)
-    shutil.copy("data.txt",admixoutdir)
+    shutil.copy(datafile,admixoutdir)
     os.chdir(admixoutdir)
     subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --out %s"%(base,base)))
     shutil.copy("%s.bed"%(base),"%sI.bed"%(base))
@@ -233,7 +233,7 @@ def cleanup(pwd):
                 shutil.copy(path,finpath)
     return
 
-def controller(pwd,basename,k):
+def controller(pwd,basename,k,datafile):
     baseo='%s_o'%(basename)
     basep='%s_p'%(basename)
     pcafile='%s%s.evec'%(pwd,basename)
@@ -241,8 +241,8 @@ def controller(pwd,basename,k):
     vcftoplink(pwd,basename,baseo,basep)
     axes=PCAer(pwd,basep)
     Rplot(pwd,basep,axes)
-    lowestk=admixture(pwd,basep,k)
-    # lowestk=4
+    lowestk=admixture(pwd,basep,k,datafile)
+    # lowestk=2
     plotadmix(pwd,basep,lowestk)
     ro.r("write.table(am2, file='%smergeddataI.txt', quote=FALSE, row.names=FALSE, sep='\t')"%(pwd))
     cleanup(pwd)
@@ -251,14 +251,14 @@ def controller(pwd,basename,k):
 def main():
     # pwd=subprocess.check_output(shlex.split('pwd'))
     #basename = raw_input("Enter basename of VCF file:\n")
-    pwd='/Users/josec/Desktop/Trapdoor/freshstart/rb/rb_outfiles/'
-    basename="rb"
-    datafile="data.txt"
+    pwd='/Users/josec/Desktop/marzo/marzo_all/noout_outfiles/'
+    basename="noout"
+    datafile="MarzoData.txt"
     # installtest(pwd)
     loaddata(pwd,datafile)
-    k=1
+    k=10
     bs=10
-    controller(pwd,basename,k+1)
+    controller(pwd,basename,k+1,datafile)
     raxer(pwd,basename,bs)
     print "ALLDone"
     return
