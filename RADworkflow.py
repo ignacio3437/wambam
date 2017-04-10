@@ -122,7 +122,7 @@ def Rplot(pwd,basename,type,lowestk):
         rplot(am2.rx2("LON"),am2.rx2("LAT"),col=am2.rx2("Sgroup"),main="%s_MAP_AdmixGroup_%d"%(basename.strip("_p"),lowestk),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
         grdevices.dev_off()
         grdevices.png(file="%s%s_PCA_AdmixGroup_%d.png"%(admixoutdir,basename,lowestk), width=1000, height=1000)
-        rplot(am2.rx2("V2"),am2.rx2("V3"),col=am2.rx2("Sgroup"),main="%s_PCA_AdmixGroup_%d"%(basename.strip("_p"),lowestk),ylab=type[1],xlab=type[0],pch=20,cex=2,)
+        rplot(am2.rx2("V2"),am2.rx2("V3"),col=am2.rx2("Sgroup"),main="%s_PCA_AdmixGroup_%d"%(basename.strip("_p"),lowestk),ylab="PCA axis 2",xlab="PCA axis 2",pch=20,cex=2,)
         grdevices.dev_off()
     return
 
@@ -242,7 +242,7 @@ def controller(pwd,basename,k,datafile):
     axes=PCAer(pwd,basep)
     Rplot(pwd,basep,axes,1)
     lowestk=admixture(pwd,basep,k,datafile)
-    # lowestk=3
+    # lowestk=5
     plotadmix(pwd,basep,lowestk)
     ro.r("write.table(am2, file='%smergeddataI.txt', quote=FALSE, row.names=FALSE, sep='\t')"%(pwd))
     cleanup(pwd)
@@ -251,12 +251,12 @@ def controller(pwd,basename,k,datafile):
 def main():
     # pwd=subprocess.check_output(shlex.split('pwd'))
     #basename = raw_input("Enter basename of VCF file:\n")
-    pwd="/Users/josec/Desktop/Planigale/pk/"
-    basename="Pk"
-    datafile="Pk_data.txt"
+    pwd="/Users/josec/Desktop/Planigale/pt/"
+    basename="Pt"
+    datafile="Pt_data.txt"
     # installtest(pwd)
     loaddata(pwd,datafile)
-    k=5
+    k=10
     bs=1
     controller(pwd,basename,k+1,datafile)
     raxer(pwd,basename,bs)
