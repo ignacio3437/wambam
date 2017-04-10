@@ -88,7 +88,7 @@ def PCAer(pwd,basep):
     return axes
 
 
-def Rplot(pwd,basename,type):
+def Rplot(pwd,basename,type,lowestk):
     admixoutdir=pwd+"admixture/"
     if "PCA" in type[1]:
         ##Merges PCA output and Datafile in R then prints XY plots as PNG in pwd.
@@ -118,11 +118,11 @@ def Rplot(pwd,basename,type):
         ro.r('evec <- read.table(file="%s%s.evec")'%(pwd,basename))
         ro.r('am2 <- merge(am2,evec,all.x=TRUE,by.x="Sample",by.y="V1")')
         am2=ro.r['am2']
-        grdevices.png(file="%s%s_MAP_AdmixGroup.png"%(admixoutdir,basename), width=1000, height=1000)
-        rplot(am2.rx2("LON"),am2.rx2("LAT"),col=am2.rx2("Sgroup"),main="%s_MAP_AdmixGroup"%(basename.strip("_p")),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
+        grdevices.png(file="%s%s_MAP_AdmixGroup_%d.png"%(admixoutdir,basename,lowestk), width=1000, height=1000)
+        rplot(am2.rx2("LON"),am2.rx2("LAT"),col=am2.rx2("Sgroup"),main="%s_MAP_AdmixGroup_%d"%(basename.strip("_p"),lowestk),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
         grdevices.dev_off()
-        grdevices.png(file="%s%s_PCA_AdmixGroup.png"%(admixoutdir,basename), width=1000, height=1000)
-        rplot(am2.rx2("V2"),am2.rx2("V3"),col=am2.rx2("Sgroup"),main="%s_PCA_COI"%(basename.strip("_p")),ylab=type[1],xlab=type[0],pch=20,cex=2,)
+        grdevices.png(file="%s%s_PCA_AdmixGroup_%d.png"%(admixoutdir,basename,lowestk), width=1000, height=1000)
+        rplot(am2.rx2("V2"),am2.rx2("V3"),col=am2.rx2("Sgroup"),main="%s_PCA_AdmixGroup_%d"%(basename.strip("_p"),lowestk),ylab=type[1],xlab=type[0],pch=20,cex=2,)
         grdevices.dev_off()
     return
 
@@ -184,7 +184,7 @@ def plotadmix(pwd,basename,lowestk):
     taxdict={}
     qdict = {}
     qfile="%s%s.%d.Q"%(admixoutdir,basename,lowestk)
-    Rplot(admixoutdir,basename,"CV")
+    Rplot(admixoutdir,basename,"CV",lowestk)
     with open("%s%s.fam"%(admixoutdir,basename),'ru') as ns:
         nslines=ns.readlines()
         tlist=[t.strip().split(" ")[0] for t in nslines]
@@ -207,7 +207,7 @@ def plotadmix(pwd,basename,lowestk):
             aout.write("%s\t%d\n"%(key,qdict[key]))
     ro.r('aout <- read.table(file="%s",header=TRUE)'%(aoutname))
     ro.r('am2 <- merge(dat,aout,by.x="Sample",by.y="Sample")')
-    Rplot(pwd,basename,"admix")
+    Rplot(pwd,basename,"admix",lowestk)
     return
 
 
@@ -240,9 +240,9 @@ def controller(pwd,basename,k,datafile):
     # ##Comment out steps to skip them. PCAer() and Rplot() need to be run together
     vcftoplink(pwd,basename,baseo,basep)
     axes=PCAer(pwd,basep)
-    Rplot(pwd,basep,axes)
+    Rplot(pwd,basep,axes,1)
     lowestk=admixture(pwd,basep,k,datafile)
-    # lowestk=2
+    # lowestk=3
     plotadmix(pwd,basep,lowestk)
     ro.r("write.table(am2, file='%smergeddataI.txt', quote=FALSE, row.names=FALSE, sep='\t')"%(pwd))
     cleanup(pwd)
@@ -251,13 +251,13 @@ def controller(pwd,basename,k,datafile):
 def main():
     # pwd=subprocess.check_output(shlex.split('pwd'))
     #basename = raw_input("Enter basename of VCF file:\n")
-    pwd='/Users/josec/Desktop/marzo/marzo_all/noout_outfiles/'
-    basename="noout"
-    datafile="MarzoData.txt"
+    pwd="/Users/josec/Desktop/Planigale/pk/"
+    basename="Pk"
+    datafile="Pk_data.txt"
     # installtest(pwd)
     loaddata(pwd,datafile)
-    k=10
-    bs=10
+    k=5
+    bs=1
     controller(pwd,basename,k+1,datafile)
     raxer(pwd,basename,bs)
     print "ALLDone"
