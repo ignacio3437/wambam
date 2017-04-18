@@ -5,12 +5,16 @@ import sys
 import re
 from collections import Counter
 pwd="/Users/josec/Desktop/Pop2/"
-def dir_finder():
-    return
+#pwd=os.getcwd()
 
-def read_param():
-
-    return
+def read_param(param_txt):
+    parameters=[]
+    with open(param_txt, "rU") as param_file:
+        params=param_file.readlines()
+    for line in params:
+        if "#" in line:
+            parameters.append(line.split()[0])
+    return parameters
 
 def read_metadata():
     return
@@ -52,12 +56,13 @@ def write_out_nexus():
     return
 
 def controller():
-    return
-
-def main():
     nexus_file="/Users/josec/Desktop/Pop2/in.nex"
     cleanup="in_clean.nex"
     print nexuscleanuper(nexus_file, cleanup)
+    return
+
+def main():
+    parameters=read_param("/Users/josec/Desktop/Pop2/param-in.txt")
     return
 
 
