@@ -7,6 +7,7 @@ from pandas import *
 from rpy2.robjects.packages import importr
 import rpy2.robjects as ro
 ggmap = importr('ggmap')
+ggplot = importr('ggplot2')
 grdevices = importr('grDevices')
 rplot=ro.r('plot')
 
@@ -99,16 +100,14 @@ def Rplot(pwd,basename,type,lowestk):
 		dat=ro.r['dat']
 		m2=ro.r['m2']
 		grdevices.png(file="%s%s_MAP_CO1.png"%(pwd,basename), width=1000, height=1000)
-		ro.r('lbound<-c(min(dat$LON),min(dat$LAT));ubound<-c(max(dat$LON),max(dat$LAT));bounds<-c(lbound,ubound);Category<-factor(dat$COI_both)')
-		ro.r('map<-get_map(location=bounds,zoom=7,maptype="satellite")')
+		ro.r('lbound<-c(min(dat$LON),min(dat$LAT));ubound<-c(max(dat$LON),max(dat$LAT));bounds<-c(lbound,ubound);Category<-factor(dat$COI_both);options(warn=-1)')
+		ro.r('map<-get_map(location=bounds,zoom=7,maptype="satellite");options(warn=0)')
 		ro.r('plot(ggmap(map)+geom_point(data = dat,aes(LON,LAT,colour=Category,size=1),show.legend = FALSE)+scale_color_brewer(palette="Set3"))')
-
-		# rplot(m2.rx2("LON"),m2.rx2("LAT"),col=m2.rx2("COI_both"),main="%s_MAP_COI"%(basename.strip("_p")),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
-		### Add labels
-		# ro.r('text(m2$LON,m2$LAT,m2$Sample,cex=0.8)')
 		grdevices.dev_off()
-		grdevices.png(file="%s%s_PCA_CO1.png"%(pwd,basename), width=1000, height=1000)
-		rplot(m2.rx2("V2"),m2.rx2("V3"),col=m2.rx2("COI_both"),main="%s_PCA_COI"%(basename.strip("_p")),ylab=type[1],xlab=type[0],pch=20,cex=2,)
+		# grdevices.png(file="%s%s_PCA_CO1.png"%(pwd,basename), width=1000, height=1000)
+		ro.r('png("%s%s_PCA_CO1.png")'%(pwd,basename))
+		ro.r('myplot<-ggplot(m2,aes(x=V2,y=V3,color=factor(COI_both)))+geom_point(show.legend=F)+scale_color_brewer(palette="Set3")+theme_dark()+labs(x="%s",y="%s")'%(type[0],type[1]))
+		ro.r('print(myplot)')
 		grdevices.dev_off()
 	elif "CV" in type:
 		##Print CV error plot to determine best K from admixture.
@@ -231,6 +230,7 @@ def cleanup(pwd):
 		os.mkdir(finpath)
 	for root, dirs, files in os.walk(pwd):
 		for file in files:
+			print file
 			path=os.path.join(root,file)
 			if file.endswith("png") and "figures" not in path:
 				shutil.copy(path,figpath)
@@ -256,13 +256,13 @@ def controller(pwd,basename,k,datafile):
 def main():
 	# pwd=subprocess.check_output(shlex.split('pwd'))
 	#basename = raw_input("Enter basename of VCF file:\n")
-	pwd="/Users/josec/Desktop/Planigale/pt/"
-	basename="Pt"
-	datafile="Pt_data.txt"
+	pwd="/Users/josec/Desktop/Planigale/pt_80/"
+	basename="Pt_80"
+	datafile="Pt_data2.txt"
 	# installtest(pwd)
 	loaddata(pwd,datafile)
-	k=1
-	bs=1
+	k=10
+	bs=10
 	controller(pwd,basename,k+1,datafile)
 	raxer(pwd,basename,bs)
 	print "ALLDone"
