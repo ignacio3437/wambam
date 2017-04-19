@@ -44,7 +44,7 @@ def read_popfile(pop_groups):
         pop_dict[renamed_sample]=ipop
     return pop_dict
 
-def nexuscleanuper(nexus_file, cleanup):
+def nexuscleanuper(nexus_file):
     #pull out the sheets in the directory and make a list of the files and taxa for each file
     nex_seqnames=[]
     NTAX_PATTERN = re.compile(r"""taxlabels""", re.IGNORECASE)
@@ -61,11 +61,7 @@ def nexuscleanuper(nexus_file, cleanup):
                 filestring=filestring.replace(oldname,name)
                 nex_seqnames.append(name)
                 i+=1
-    outfile_name="%s_clean"%(os.path.basename(nexus_file))
-    with open(os.path.join(pwd,outfile_name),"w") as outfile:
-        outfile.write(filestring)
-        nex_text=filestring
-        outfile.close()
+    nex_text=filestring
     return nex_seqnames,nex_text
 
 def pop_binary(sorted_pops):
@@ -84,8 +80,7 @@ def pop_binary(sorted_pops):
 def main():
     parameters=read_param(os.path.join(pwd,"parameters.txt"))
     [nexus_file,pop_groups,pop_order]=parameters
-    cleanup="clean_%s"%(os.path.basename(nexus_file))
-    nex_seqnames,nex_text=nexuscleanuper(nexus_file, cleanup)
+    nex_seqnames,nex_text=nexuscleanuper(nexus_file)
     pop_dict=read_popfile(pop_groups)
     #Check if pop_order file
     if "#" in pop_order:
