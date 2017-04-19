@@ -1,5 +1,4 @@
 #!/usr/bin/python
-
 import os
 import sys
 import re
@@ -18,7 +17,7 @@ def read_param(param_txt):
 
 def read_popsort(pop_order):
     with open(pop_order, "rU") as pop_order_file:
-        sorted_pops=[n.strip('\n') for n in pop_order_file.readlines()]
+        sorted_pops=[n.strip('\n').replace(" ","_") for n in pop_order_file.readlines()]
     return sorted_pops
 
 def name_cleaner(line):
@@ -41,8 +40,8 @@ def read_popfile(pop_groups):
     for line in lines[1:]:
         sample=line.split(',')[Sample_index]
         [oldsample,renamed_sample]=name_cleaner(sample)
-        pop_dict[renamed_sample]=line.split(',')[Pop_index]
-    print pop_dict
+        ipop=line.split(',')[Pop_index].replace(" ","_")
+        pop_dict[renamed_sample]=ipop
     return pop_dict
 
 def nexuscleanuper(nexus_file, cleanup):
@@ -65,22 +64,50 @@ def nexuscleanuper(nexus_file, cleanup):
     outfile_name="%s_clean"%(os.path.basename(nexus_file))
     with open(os.path.join(pwd,outfile_name),"w") as outfile:
         outfile.write(filestring)
+        nex_text=filestring
         outfile.close()
-    return nex_seqnames
+    return nex_seqnames,nex_text
 
+def pop_binary(sorted_pops):
+    binary_dict={}
+    binary_code=[]
+    for place in sorted_pops:
+        binary_code.append("0")
+    binary_code.pop()
+    for i,place in enumerate(sorted_pops):
+        binary_code.insert(i,"1")
+        binary_dict[place]=",".join(binary_code)
+        binary_code.pop(i)
+    return binary_dict
 
 
 def main():
     parameters=read_param(os.path.join(pwd,"parameters.txt"))
     [nexus_file,pop_groups,pop_order]=parameters
     cleanup="clean_%s"%(os.path.basename(nexus_file))
-    nex_seqnames=nexuscleanuper(nexus_file, cleanup)
+    nex_seqnames,nex_text=nexuscleanuper(nexus_file, cleanup)
+    pop_dict=read_popfile(pop_groups)
     #Check if pop_order file
     if "#" in pop_order:
-        pop_order=False
+        sorted_pops=list(set(pop_dict.values()))
     else:
         sorted_pops=read_popsort(pop_order)
-    pop_dict=read_popfile(pop_groups)
+    binary_dict=pop_binary(sorted_pops)
+
+    #The fun part:
+    block1="BEGIN TRAITS;\nFormat labels=yes separator=Comma;\n"
+    block2="Dimensions NTRAITS=%d;\n"%(len(sorted_pops))
+    block3="TraitLabels %s;\nMatrix\n"%(' '.join(sorted_pops))
+    popblock= block1+block2+block3
+    with open(os.path.join(pwd,"out.nex"),'w') as outf:
+        outf.write(nex_text)
+        outf.write(popblock)
+        for seq in nex_seqnames:
+            seq_pop=pop_dict[seq]
+            code= binary_dict[seq_pop]
+            outf.write('%s %s\n'%(seq,code))
+        outf.write(';\nEND;\n')
+
     return
 
 
