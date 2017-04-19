@@ -3,7 +3,8 @@ import os
 import sys
 import re
 from collections import Counter
-pwd=os.getcwd()
+
+pwd=os.path.dirname(__file__)
 
 def read_param(param_txt):
     parameters=[]
@@ -11,7 +12,7 @@ def read_param(param_txt):
         params=param_file.readlines()
     for line in params:
         if "#" in line:
-            parameters.append(pwd+line.split()[0])
+            parameters.append(os.path.join(pwd,line.split()[0]))
     return parameters
 
 def read_popsort(pop_order):
