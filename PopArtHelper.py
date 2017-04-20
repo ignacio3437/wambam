@@ -5,8 +5,9 @@ import re
 from collections import Counter
 
 raw_pwd=raw_input("Please enter full path of parameter file: ")
-clean_pwd=raw_pwd.replace('\\','')
+clean_pwd=raw_pwd.replace('\\','').strip()
 pwd=os.path.dirname(clean_pwd)
+param_filne=os.path.basename(clean_pwd)
 
 def read_param(param_txt):
     parameters=[]
@@ -78,7 +79,7 @@ def pop_binary(sorted_pops):
     return binary_dict
 
 def main():
-    parameters=read_param(os.path.join(pwd,"parameters.txt"))
+    parameters=read_param(os.path.join(pwd,param_filne))
     [nexus_file,pop_groups,pop_order]=parameters
     nex_seqnames,nex_text=nexuscleanuper(nexus_file)
     pop_dict=read_popfile(pop_groups)
@@ -92,7 +93,8 @@ def main():
     block2="Dimensions NTRAITS=%d;\n"%(len(sorted_pops))
     block3="TraitLabels %s;\nMatrix\n"%(' '.join(sorted_pops))
     popblock= block1+block2+block3
-    with open(os.path.join(pwd,"PopArt_%s"%(nexus_file)),'w') as outf:
+    nexus_file_base=os.path.basename(nexus_file.replace('.nex',''))
+    with open(os.path.join(pwd,"%s_PopArt.nex"%(nexus_file_base)),'w') as outf:
         outf.write(nex_text)
         outf.write(popblock)
         for seq in nex_seqnames:
@@ -101,7 +103,6 @@ def main():
             outf.write('%s %s\n'%(seq,code))
         outf.write(';\nEND;\n')
     return
-
 
 if __name__ == '__main__':
     main()
