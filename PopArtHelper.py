@@ -5,8 +5,8 @@ import re
 from collections import Counter
 
 raw_pwd=raw_input("Please enter full path of parameter file: ")
-clean_pwd=raw_pwd.replace(" ","")
-pwd=os.path.dirname(raw_pwd)
+clean_pwd=raw_pwd.replace('\\','')
+pwd=os.path.dirname(clean_pwd)
 
 def read_param(param_txt):
     parameters=[]
@@ -92,7 +92,7 @@ def main():
     block2="Dimensions NTRAITS=%d;\n"%(len(sorted_pops))
     block3="TraitLabels %s;\nMatrix\n"%(' '.join(sorted_pops))
     popblock= block1+block2+block3
-    with open(os.path.join(pwd,"out.nex"),'w') as outf:
+    with open(os.path.join(pwd,"PopArt_%s"%(nexus_file)),'w') as outf:
         outf.write(nex_text)
         outf.write(popblock)
         for seq in nex_seqnames:
