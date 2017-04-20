@@ -4,7 +4,9 @@ import sys
 import re
 from collections import Counter
 
-pwd=os.path.dirname(__file__)
+raw_pwd=raw_input("Please enter full path of parameter file: ")
+clean_pwd=raw_pwd.replace(" ","")
+pwd=os.path.dirname(raw_pwd)
 
 def read_param(param_txt):
     parameters=[]
