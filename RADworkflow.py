@@ -39,15 +39,15 @@ def loaddata(pwd,datafile):
 
 def vcftoplink(pwd,basename,baseo,basep,taxon_cov):
     os.chdir(pwd)
-    # subprocess.check_output(shlex.split("vcftools --max-missing %f --vcf %s.vcf --recode"%(taxon_cov,basename)))
-    # subprocess.check_output(shlex.split("vcftools --vcf out.recode.vcf --out %s --plink"%(baseo)))
+    subprocess.check_output(shlex.split("vcftools --max-missing %f --vcf %s.vcf --recode"%(taxon_cov,basename)))
+    subprocess.check_output(shlex.split("vcftools --vcf out.recode.vcf --out %s --plink"%(baseo)))
     ##changes the chromosome all of the SNP to chromosome 1 for forward compatibility with structure like programs.
     with open("%s_temp.map"%(basename),"w") as outfile:
         subprocess.call(shlex.split("awk '$1=1' %s.map"%(baseo)),stdout=outfile)
     print subprocess.check_output(shlex.split("mv %s_temp.map %s.map"%(basename,baseo)))
     ##Prunes the dataset
     subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(baseo)))
-    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --geno 0.90 --mind 0.9 --maf 0.05 --out %s"%(baseo,basep)))
+    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --geno 0.90 --maf 0.05 --out %s"%(baseo,basep)))
     return
 
 
@@ -249,7 +249,6 @@ def controller(pwd,basename,k,datafile,taxon_cov):
     Rplot(pwd,basep,axes,1)
     lowestk=admixture(pwd,basep,k,datafile)
     lowestk=2
-
     plotadmix(pwd,basep,lowestk)
     ro.r("write.table(am2, file='%smergeddataI.txt', quote=FALSE, row.names=FALSE, sep='\t')"%(pwd))
     cleanup(pwd)
@@ -263,9 +262,9 @@ def main():
     datafile="Pt_test_data.txt"
     # installtest(pwd)
     loaddata(pwd,datafile)
-    k=2
+    k=10
     bs=10
-    taxon_cov=0.9
+    taxon_cov=0.75
     controller(pwd,basename,k+1,datafile,taxon_cov)
     raxer(pwd,basename,bs)
     print "ALLDone"
