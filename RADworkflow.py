@@ -39,8 +39,8 @@ def loaddata(pwd,datafile):
 
 def vcftoplink(pwd,basename,baseo,basep,taxon_cov):
     os.chdir(pwd)
-    subprocess.check_output(shlex.split("vcftools --max-missing %f --vcf %s.vcf --recode"%(taxon_cov,basename)))
-    subprocess.check_output(shlex.split("vcftools --vcf out.recode.vcf --out %s --plink"%(baseo)))
+    # subprocess.check_output(shlex.split("vcftools --max-missing %f --vcf %s.vcf --recode"%(taxon_cov,basename)))
+    # subprocess.check_output(shlex.split("vcftools --vcf out.recode.vcf --out %s --plink"%(baseo)))
     ##changes the chromosome all of the SNP to chromosome 1 for forward compatibility with structure like programs.
     with open("%s_temp.map"%(basename),"w") as outfile:
         subprocess.call(shlex.split("awk '$1=1' %s.map"%(baseo)),stdout=outfile)
@@ -100,14 +100,14 @@ def Rplot(pwd,basename,type,lowestk):
         ro.r('m2 <- merge(dat,evec,by.x="Sample",by.y="V1")')
         dat=ro.r['dat']
         m2=ro.r['m2']
-        grdevices.png(file="%s%s_MAP_CO1.png"%(pwd,basename), width=1000, height=1000)
+        grdevices.png(file="%s%s_MAP_Group.png"%(pwd,basename), width=1000, height=1000)
         ro.r('lbound<-c(min(dat$LON),min(dat$LAT));ubound<-c(max(dat$LON),max(dat$LAT));bounds<-c(lbound,ubound);Category<-factor(dat$COI_both);options(warn=-1)')
         ro.r('map<-get_map(location=bounds,zoom=7,maptype="satellite");options(warn=0)')
-        ro.r('plot(ggmap(map)+geom_point(data = dat,aes(LON,LAT,colour=Category,size=1),show.legend = FALSE)+scale_color_brewer(palette="Set3"))')
+        ro.r('plot(ggmap(map)+ggtitle("Map by Group")+geom_point(data = dat,aes(LON,LAT,colour=Category,size=1),show.legend = FALSE)+scale_color_brewer(palette="Set3"))')
         grdevices.dev_off()
         # grdevices.png(file="%s%s_PCA_CO1.png"%(pwd,basename), width=1000, height=1000)
-        ro.r('png("%s%s_PCA_CO1.png", width=1000, height=1000)'%(pwd,basename))
-        ro.r('myplot<-ggplot(m2,aes(x=V2,y=V3,color=factor(COI_both)))+geom_point(size=4,show.legend=F)+scale_color_brewer(palette="Set3")+theme_dark(text = element_text(size=20))+labs(x="%s",y="%s")'%(type[0],type[1]))
+        ro.r('png("%s%s_PCA_Group.png", width=1000, height=1000)'%(pwd,basename))
+        ro.r('myplot<-ggplot(m2,aes(x=V2,y=V3,color=factor(COI_both)))+ggtitle("PCA by Group")+geom_point(size=4,show.legend=F)+scale_color_brewer(palette="Set3")+theme_dark(base_size=16)+labs(x="%s",y="%s")'%(type[0],type[1]))
         ro.r('print(myplot)')
         grdevices.dev_off()
     elif "CV" in type:
@@ -120,15 +120,15 @@ def Rplot(pwd,basename,type,lowestk):
         grdevices.dev_off()
         os.chdir(pwd)
     elif "admix" in type:
-        ro.r('palette(sample(rainbow(10)))')
         ro.r('evec <- read.table(file="%s%s.evec")'%(pwd,basename))
         ro.r('am2 <- merge(am2,evec,all.x=TRUE,by.x="Sample",by.y="V1")')
         am2=ro.r['am2']
         grdevices.png(file="%s%s_MAP_AdmixGroup_%d.png"%(admixoutdir,basename,lowestk), width=1000, height=1000)
-        rplot(am2.rx2("LON"),am2.rx2("LAT"),col=am2.rx2("Sgroup"),main="%s_MAP_AdmixGroup_%d"%(basename.strip("_p"),lowestk),ylab="Lattitude",xlab="Longitude",pch=20,cex=2)
+        ro.r('plot(ggmap(map)+ggtitle("Map by Admixture Group")+geom_point(data = am2,aes(LON,LAT,colour=factor(Sgroup),size=1),show.legend = FALSE)+scale_color_brewer(palette="Accent"))')
         grdevices.dev_off()
-        grdevices.png(file="%s%s_PCA_AdmixGroup_%d.png"%(admixoutdir,basename,lowestk), width=1000, height=1000)
-        rplot(am2.rx2("V2"),am2.rx2("V3"),col=am2.rx2("Sgroup"),main="%s_PCA_AdmixGroup_%d"%(basename.strip("_p"),lowestk),ylab="PCA axis 2",xlab="PCA axis 2",pch=20,cex=2,)
+        ro.r('png("%s%s_PCA_AdmixGroup_%d.png", width=1000, height=1000)'%(admixoutdir,basename,lowestk))
+        ro.r('myAPCAplot<-ggplot(am2,aes(x=V2,y=V3,color=factor(Sgroup)))+ggtitle("PCA by Admixture K=%s")+geom_point(size=4,show.legend=F)+scale_color_brewer(palette="Accent")+theme_dark(base_size=16)+labs(x="PCA axis 1",y="PCA axis 2")'%(lowestk))
+        ro.r('print(myAPCAplot)')
         grdevices.dev_off()
     return
 
@@ -248,7 +248,8 @@ def controller(pwd,basename,k,datafile,taxon_cov):
     axes=PCAer(pwd,basep)
     Rplot(pwd,basep,axes,1)
     lowestk=admixture(pwd,basep,k,datafile)
-    # lowestk=5
+    lowestk=2
+
     plotadmix(pwd,basep,lowestk)
     ro.r("write.table(am2, file='%smergeddataI.txt', quote=FALSE, row.names=FALSE, sep='\t')"%(pwd))
     cleanup(pwd)
@@ -262,7 +263,7 @@ def main():
     datafile="Pt_test_data.txt"
     # installtest(pwd)
     loaddata(pwd,datafile)
-    k=10
+    k=2
     bs=10
     taxon_cov=0.9
     controller(pwd,basename,k+1,datafile,taxon_cov)
