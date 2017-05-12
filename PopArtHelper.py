@@ -2,16 +2,18 @@
 import os
 import sys
 import re
-from collections import Counter
 
 raw_pwd=raw_input("Please enter full path of parameter file: ")
-clean_pwd=raw_pwd.replace('\\','').strip()
+clean_pwd=raw_pwd.replace('"','').strip()
 pwd=os.path.dirname(clean_pwd)
-param_filne=os.path.basename(clean_pwd)
+param_file=os.path.basename(clean_pwd)
+
+print os.path.join(pwd,param_file)
+
 
 def read_param(param_txt):
     parameters=[]
-    with open(param_txt, "rU") as param_file:
+    with open(param_txt, "Ur") as param_file:
         params=param_file.readlines()
     for line in params:
         if "#" in line:
@@ -19,13 +21,13 @@ def read_param(param_txt):
     return parameters
 
 def read_popsort(pop_order):
-    with open(pop_order, "rU") as pop_order_file:
+    with open(pop_order, "Ur") as pop_order_file:
         sorted_pops=[n.strip('\n').replace(" ","_") for n in pop_order_file.readlines()]
     return sorted_pops
 
 def name_cleaner(line):
-    NAME_PATTERN = re.compile(r"""[A-Za-z0-9]+""")
-    OLDNAME_PATTERN = re.compile(r"""[^\[\n\t]+""")
+    NAME_PATTERN = re.compile(r"[A-Za-z0-9]+")
+    OLDNAME_PATTERN = re.compile(r"[^\[\n\t]+")
     namere=re.search(NAME_PATTERN, line)
     name=namere.group()
     oldnamere=re.search(OLDNAME_PATTERN, line)
@@ -34,8 +36,8 @@ def name_cleaner(line):
 
 def read_popfile(pop_groups):
     pop_dict={}
-    with open(pop_groups, "rU") as pop_file:
-        lines=[n.strip('\n') for n in pop_file.readlines()]
+    with open(pop_groups, "Ur") as pop_file:
+        lines=[n.strip('\n') for n in pop_file.readlines()if len(n)>1]
     header=lines[0].split(',')
     Sample_index=header.index('Sample')
     Pop_index=header.index('Pop')
@@ -49,19 +51,23 @@ def read_popfile(pop_groups):
 def nexuscleanuper(nexus_file):
     #pull out the sheets in the directory and make a list of the files and taxa for each file
     nex_seqnames=[]
-    NTAX_PATTERN = re.compile(r"""taxlabels""", re.IGNORECASE)
-    with open(nexus_file,'rU') as f:
+    NTAX_PATTERN = re.compile(r"matrix", re.IGNORECASE)
+    with open(nexus_file,'Ur') as f:
         lines=f.readlines()
-    with open(nexus_file,'rU') as f:
+    with open(nexus_file,'Ur') as f:
         filestring=f.read()
     for i,line in enumerate(lines):
         ntax=re.search(NTAX_PATTERN,line)
         if ntax:
             while ';' not in lines[i+1]:
                 nextline= lines[i+1]
-                [oldname,name]=name_cleaner(nextline)
-                filestring=filestring.replace(oldname,name)
-                nex_seqnames.append(name)
+                namepart=nextline.lstrip().split('\t')[0]
+                if len(namepart)>1:
+                    [oldname,name]=name_cleaner(namepart)
+                    filestring=filestring.replace(oldname,name)
+                    nex_seqnames.append(name)
+                else:
+                    pass
                 i+=1
     nex_text=filestring
     return nex_seqnames,nex_text
@@ -79,7 +85,7 @@ def pop_binary(sorted_pops):
     return binary_dict
 
 def main():
-    parameters=read_param(os.path.join(pwd,param_filne))
+    parameters=read_param(os.path.join(pwd,param_file))
     [nexus_file,pop_groups,pop_order]=parameters
     nex_seqnames,nex_text=nexuscleanuper(nexus_file)
     pop_dict=read_popfile(pop_groups)
