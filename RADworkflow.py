@@ -1,4 +1,5 @@
-#!/usr/bin/python
+#!/Users/josec/miniconda2/bin/python
+####!/usr/bin/python
 import os,sys,re,subprocess,shutil,shlex
 import random
 from numpy import *
@@ -42,8 +43,7 @@ def vcftoplink(pwd,basename,baseo,basep,taxon_cov):
     print subprocess.check_output(shlex.split("mv %s_temp.map %s.map"%(basename,baseo)))
     ##Prunes the dataset
     subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(baseo)))
-    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --freq --maf 0.001 --out %s"%(baseo,basep)))
-    # subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --out %s"%(baseo,basep)))
+    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --freq --maf 0.0005 --out %s"%(baseo,basep)))
     return
 
 
@@ -61,6 +61,7 @@ def PCAer(pwd,basep):
     grmoutname:      grmjunk
     numthreads:   8
     lsqproject:    YES
+    outliersigmathresh: 8
         """%(basep,basep,basep,basep,basep))
     ### add     outliersigmathresh: 7 if you want more outliers
     pcaoutfile=pwd+basep+'_pcaoutI.txt'
@@ -99,18 +100,18 @@ def Rplot(pwd,basename,type,lowestk,taxon_cov):
         m2=ro.r['m2']
         grdevices.png(file="%s%s_MAP_Pop_%sTC.png"%(pwd,basename,taxon_cov), width=1000, height=1000)
         ro.r('lbound<-c(min(dat$LON),min(dat$LAT));ubound<-c(max(dat$LON),max(dat$LAT));bounds<-c(lbound,ubound);Category<-factor(dat$COI_both);options(warn=-1)')
-        ro.r('map<-get_map(location=bounds,zoom=7,maptype="satellite");options(warn=0)')
+        ro.r('map<-get_map(location=bounds,zoom=6,maptype="satellite");options(warn=0)')
         ro.r('plot(ggmap(map)+ggtitle("Map by Pop")+geom_point(data = dat,aes(LON,LAT,colour=Category,size=1),show.legend=T)+scale_color_brewer(palette="Set3"))')
         grdevices.dev_off()
         ro.r('png("%s%s_PCA_Pop_%sTC.png", width=1000, height=1000)'%(pwd,basename,taxon_cov))
-        ro.r('myplot<-ggplot(m2,aes(x=V2,y=V3,color=factor(COI_both)))+ggtitle("PCA by Pop")+geom_point(size=4,show.legend=F)+scale_color_brewer(palette="Set3")+theme_dark(base_size=16)+labs(x="%s",y="%s")'%(type[0],type[1]))
+        ro.r('myplot<-ggplot(m2,aes(x=V2,y=V3,color=factor(COI_both)))+ggtitle("PCA by Pop")+geom_point(size=4,show.legend=T)+scale_color_brewer(palette="Set3")+theme_dark(base_size=16)+labs(x="%s",y="%s")'%(type[0],type[1]))
         ro.r('print(myplot)')
         grdevices.dev_off()
-        ro.r('palette(brewer.pal(12,"Set3"))')
-        ro.r('png("%s%s_PCA3D_Pop_%sTC.png", width=1000, height=1000)'%(pwd,basename,taxon_cov))
-        ro.r('myplot3D<-scatterplot3d(m2$V2,m2$V3,m2$V4,pch=16,color=as.numeric(m2$COI_both))')
-        ro.r('print(myplot3D)')
-        grdevices.dev_off()
+        # ro.r('palette(brewer.pal(12,"Set3"))')
+        # ro.r('png("%s%s_PCA3D_Pop_%sTC.png", width=1000, height=1000)'%(pwd,basename,taxon_cov))
+        # ro.r('myplot3D<-scatterplot3d(m2$V2,m2$V3,m2$V4,pch=16,color=as.numeric(m2$COI_both))')
+        # ro.r('print(myplot3D)')
+        # grdevices.dev_off()
     elif "CV" in type:
         ##Print CV error plot to determine best K from admixture.
         ro.r('cvs <- read.table(file="cv.txt",header=FALSE)')
@@ -265,19 +266,19 @@ def controller(pwd,basename,k,datafile,taxon_cov):
 def main():
     # pwd=subprocess.check_output(shlex.split('pwd'))
     #basename = raw_input("Enter basename of VCF file:\n")
-    pwd="/Users/josec/Desktop/marzo/marzo_all/noout_50min_outfiles/"
-    basename="noout_50min"
-    datafile="MarzoSet2.txt"
+    pwd="/Users/josec/Desktop/Planigale/Pt/Pt_90_90TC/"
+    basename="Pt_90_90TC"
+    datafile="Pt_test_data.txt"
     # installtest(pwd)
     loaddata(pwd,datafile)
     k=10
     bs=10
-    taxon_cov=0.90
-    controller(pwd,basename,k+1,datafile,taxon_cov)
     taxon_cov=0.75
     controller(pwd,basename,k+1,datafile,taxon_cov)
-    taxon_cov=0.50
-    controller(pwd,basename,k+1,datafile,taxon_cov)
+    # taxon_cov=0.75
+    # controller(pwd,basename,k+1,datafile,taxon_cov)
+    # taxon_cov=0.50
+    # controller(pwd,basename,k+1,datafile,taxon_cov)
     # raxer(pwd,basename,bs)
     print "\n\nALLDone"
     return
