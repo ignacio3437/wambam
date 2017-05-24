@@ -1,10 +1,6 @@
 #!/Users/josec/miniconda2/bin/python
 ####!/usr/bin/python
-import os,sys,re,subprocess,shutil,shlex
-import random
-from numpy import *
-import scipy as sp
-from pandas import *
+import os,re,subprocess,shutil,shlex,random
 from rpy2.robjects.packages import importr
 import rpy2.robjects as ro
 ggmap = importr('ggmap')
@@ -15,19 +11,6 @@ grdevices = importr('grDevices')
 rplot=ro.r('plot')
 
 
-def installtest(pwd):
-    os.chdir(pwd)
-    subprocess.check_output(shlex.split("smartpca -v"))
-    subprocess.check_output(shlex.split("vcftools"))
-    subprocess.check_output(shlex.split("raxmlHPC-PTHREADS-SSE3 -v"))
-    subprocess.check_output(shlex.split("r --version"))
-    subprocess.check_output(shlex.split("ipyrad --version"))
-    subprocess.check_output(shlex.split("admixture --help"))
-    subprocess.check_output(shlex.split("plink2 --version"))
-    print "All programs installed"
-    return
-
-
 def loaddata(pwd,datafile):
     ###Datafile must be tsv with headers: Samples, LAT, LON, COI_both
     ro.r('dat <- read.table(file="%s%s",header=TRUE,sep="\t")'%(pwd,datafile))
@@ -35,19 +18,22 @@ def loaddata(pwd,datafile):
 
 
 def vcftoplink(pwd,basename,baseo,basep,taxon_cov):
+    #changes from the VCF output from pyrad to a plink file that has been cleaned up for LD and Taxon_coverate (missing data)
     os.chdir(pwd)
     subprocess.check_output(shlex.split("vcftools --vcf %s.vcf --max-missing %.2f --out %s --plink"%(basename,taxon_cov,baseo)))
     ##change Remove FUNCTION --remove-indv WAMM57947
     with open("%s_temp.map"%(basename),"w") as outfile:
         subprocess.call(shlex.split("awk '$1=1' %s.map"%(baseo)),stdout=outfile)
     print subprocess.check_output(shlex.split("mv %s_temp.map %s.map"%(basename,baseo)))
-    ##Prunes the dataset
+    ##Prunes the dataset for LD
     subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(baseo)))
-    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --freq --maf 0.0005 --out %s"%(baseo,basep)))
+    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --freq --maf 0.00005 --out %s"%(baseo,basep)))
     return
 
 
 def PCAer(pwd,basep):
+    #sets up a pca.parameter file for eigenstrat and runs it, then sends it to be plotted in R.
+    #converts the eigenvalues to %Var for top axis.
     with open(pwd+'pca.par','w') as pca:
         pca.write("""
     genotypename:    %s.ped
@@ -61,7 +47,7 @@ def PCAer(pwd,basep):
     grmoutname:      grmjunk
     numthreads:   8
     lsqproject:    YES
-    outliersigmathresh: 8
+    outliersigmathresh: 10
         """%(basep,basep,basep,basep,basep))
     ### add     outliersigmathresh: 7 if you want more outliers
     pcaoutfile=pwd+basep+'_pcaoutI.txt'
@@ -89,11 +75,11 @@ def PCAer(pwd,basep):
 
 
 def Rplot(pwd,basename,type,lowestk,taxon_cov):
+    #handler to feed commands into R to plot either: PCA, Admixture CV plots, Maps. Coloring of groups is consistent
     admixoutdir=pwd+"admixture/"
     taxon_cov=str(taxon_cov).replace('0.','')
     if "PCA" in type[1]:
         ##Merges PCA output and Datafile in R then prints XY plots as PNG in pwd.
-        ##Change coloring by searching from col=m2.rx2("XXXX")
         ro.r('evec <- read.table(file="%s%s.evec")'%(pwd,basename))
         ro.r('m2 <- merge(dat,evec,by.x="Sample",by.y="V1")')
         dat=ro.r['dat']
@@ -107,11 +93,11 @@ def Rplot(pwd,basename,type,lowestk,taxon_cov):
         ro.r('myplot<-ggplot(m2,aes(x=V2,y=V3,color=factor(COI_both)))+ggtitle("PCA by Pop")+geom_point(size=4,show.legend=T)+scale_color_brewer(palette="Set3")+theme_dark(base_size=16)+labs(x="%s",y="%s")'%(type[0],type[1]))
         ro.r('print(myplot)')
         grdevices.dev_off()
-        # ro.r('palette(brewer.pal(12,"Set3"))')
-        # ro.r('png("%s%s_PCA3D_Pop_%sTC.png", width=1000, height=1000)'%(pwd,basename,taxon_cov))
-        # ro.r('myplot3D<-scatterplot3d(m2$V2,m2$V3,m2$V4,pch=16,color=as.numeric(m2$COI_both))')
-        # ro.r('print(myplot3D)')
-        # grdevices.dev_off()
+        ro.r('palette(brewer.pal(12,"Set3"))')
+        ro.r('png("%s%s_PCA3D_Pop_%sTC.png", width=1000, height=1000)'%(pwd,basename,taxon_cov))
+        ro.r('myplot3D<-scatterplot3d(m2$V2,m2$V3,m2$V4,pch=16,color=as.numeric(m2$COI_both))')
+        ro.r('print(myplot3D)')
+        grdevices.dev_off()
     elif "CV" in type:
         ##Print CV error plot to determine best K from admixture.
         ro.r('cvs <- read.table(file="cv.txt",header=FALSE)')
@@ -136,6 +122,7 @@ def Rplot(pwd,basename,type,lowestk,taxon_cov):
 
 
 def admixture(pwd,base,k,datafile):
+    #Run admixture in new directory for range(1,k), keeps track of CV errors to plot,
     print "\n\n\n\nstart admixture"
     os.chdir(pwd)
     cvd={}
@@ -148,11 +135,11 @@ def admixture(pwd,base,k,datafile):
     shutil.copy(datafile,admixoutdir)
     os.chdir(admixoutdir)
     subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --out %s"%(base,base)))
+    ## To remove outliers from admixture tests run following command instead.
+    ## subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --remove %s_outliersI.txt --out %s"%(base,base,base)))
     shutil.copy("%s.bed"%(base),"%sI.bed"%(base))
     shutil.copy("%s.bim"%(base),"%sI.bim"%(base))
-
-    ## make this a new function...?
-    ## subprocess.check_output(shlex.split("plink2 --threads 7 --file %s --make-bed --remove %s_outliersI.txt --out %s"%(base,base,base)))
+    #Run admixture for each k 1->"k"
     for x in range(1,k):
         def admixer():
             admixcommand=shlex.split("admixture -j7 -C=0.01 --cv %s.bed %d"%(base,x))
@@ -160,7 +147,6 @@ def admixture(pwd,base,k,datafile):
             with open(admixoutdir+"admixoutI.txt",'a') as admixoutfile:
                 admixoutfile.write("####################K=%s\n####################\n"%(x))
                 for stdout_line in iter(popen.stdout.readline, ""):
-                    # print stdout_line
                     admixoutfile.write(stdout_line)
                     if "nan" in stdout_line:
                         return
@@ -174,6 +160,7 @@ def admixture(pwd,base,k,datafile):
             print "Admixture: Finished K=%d"%(x)
             return
         admixer()
+    #pick lowest K based on CV error minimum
     lowest=100
     lowestk="k"
     with open(admixoutdir+"cv.txt","w") as cvout:
@@ -187,6 +174,7 @@ def admixture(pwd,base,k,datafile):
 
 
 def plotadmix(pwd,basename,lowestk,taxon_cov):
+    #makes maps from admixture results, uses R to store the admixture results from q files. also makes cv plot in R.
     admixoutdir=pwd+"admixture/"
     os.chdir(admixoutdir)
     taxdict={}
@@ -226,6 +214,7 @@ def raxer(pwd,basename,bs):
     return
 
 def cleanup(pwd):
+    #moves important files to Analysis directory and figures to figure Directory.
     figpath=pwd+"figures/"
     if not os.path.exists(figpath):
         os.mkdir(figpath)
@@ -242,6 +231,7 @@ def cleanup(pwd):
     return
 
 def controller(pwd,basename,k,datafile,taxon_cov):
+    #Engine for the workflow
     baseo='%s_o'%(basename)
     basep='%s_p'%(basename)
     pcafile='%s%s.evec'%(pwd,basename)
@@ -250,15 +240,11 @@ def controller(pwd,basename,k,datafile,taxon_cov):
     axes=PCAer(pwd,basep)
     Rplot(pwd,basep,axes,1,taxon_cov)
     lowestk=admixture(pwd,basep,k,datafile)
+    #plot with lowestk then plot forcing k=2
     plotadmix(pwd,basep,lowestk,taxon_cov)
-    # lowestk=6
-    # plotadmix(pwd,basep,lowestk,taxon_cov)
-    # lowestk=2
-    # plotadmix(pwd,basep,lowestk,taxon_cov)
-    # lowestk=3
-    # plotadmix(pwd,basep,lowestk,taxon_cov)
-    # lowestk=4
-    # plotadmix(pwd,basep,lowestk,taxon_cov)
+    lowestk=2
+    plotadmix(pwd,basep,lowestk,taxon_cov)
+    #output R analysis to Table in case need it in future.
     ro.r("write.table(am2, file='%smergeddataI.txt', quote=FALSE, row.names=FALSE, sep='\t')"%(pwd))
     cleanup(pwd)
     return
@@ -266,20 +252,21 @@ def controller(pwd,basename,k,datafile,taxon_cov):
 def main():
     # pwd=subprocess.check_output(shlex.split('pwd'))
     #basename = raw_input("Enter basename of VCF file:\n")
-    pwd="/Users/josec/Desktop/Planigale/Pt/Pt_90_90TC/"
-    basename="Pt_90_90TC"
-    datafile="Pt_test_data.txt"
-    # installtest(pwd)
+    pwd="/Users/josec/Desktop/Planigale/Pt_Pk/"
+    basename="combined"
+    datafile="dat.txt"
     loaddata(pwd,datafile)
-    k=10
+    #variable you can change...
+    k=4
     bs=10
     taxon_cov=0.75
     controller(pwd,basename,k+1,datafile,taxon_cov)
+    #Can run again changing varibales. These are kept in the names of the files so they do not overwrite.
     # taxon_cov=0.75
     # controller(pwd,basename,k+1,datafile,taxon_cov)
-    # taxon_cov=0.50
-    # controller(pwd,basename,k+1,datafile,taxon_cov)
-    # raxer(pwd,basename,bs)
+
+    #If you want to print RaxML command (not run it)
+    raxer(pwd,basename,bs)
     print "\n\nALLDone"
     return
 
