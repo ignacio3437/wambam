@@ -1,9 +1,10 @@
 #!/usr/bin/python
 import re
+
 usage="""
 Usage: VulgarityFilter.py --in exonerate_outfile.txt
 
-Parses the output of exonerate wth --ryo '%qi\t%pi\t%qas\t%V\tEND\n'
+Parses the output of exonerate with: --ryo '%qi\t%pi\t%qas\t%V\tEND\n'
 output is the inputname.fa of a fasta with each exon listed as a seperate sequence
 example exonerate command: exonerate --model est2genome Test44.fasta /Users/josec/Desktop/NudiSilicoTest/Exonerate/acl_ref_AplCal3.0_chrUn.fa -Q DNA -T DNA --showvulgar F --showalignment F --percent 90 --verbose 0 --ryo '%qi\t%pi\t%qas\t%V\tEND\n' --fsmmemory 20G --bestn 1 > exonerate_outfile.txt
 
@@ -15,29 +16,25 @@ def openfile(infile):
 
 def parser(target):
     target_dict={}
-    #make list of items to be put in dictionary and remove new lines from strings
-    tlist=[x.replace('\n','') for x in target.strip('\n').split('\t')]
-    #name the parts to be put in dict from tlist
-    target_id=tlist[0]
-    pecentscore=tlist[1]
-    CDS=tlist[2]
-    vulgar_raw=tlist[3]
+    #make list of items to be put in dictionary and remove blank lines from strings
+    tlist=[x.replace('\n','') for x in target.split('\t')]
     #extract exon lengths from vulgar output.
+    vulgar_raw=tlist[3]
     vlist=re.findall(r'M\s\d*',vulgar_raw)
     vulgar=[int(x.replace('M ','')) for x in vlist]
     #make dictionary of all info to recall later
-    target_dict['Target']=target_id
-    target_dict['Percent']=pecentscore
-    target_dict['CDS']=CDS
+    target_dict['Target']=tlist[0]
+    target_dict['Percent']=tlist[1]
+    target_dict['CDS']=tlist[2]
     target_dict['Vulgar']=vulgar
     return target_dict
 
-def splitter(string,vlist):
-    #cuts up the CDS into exon sequences and stores them in a sequential list
+def splitter(CDS,vlist):
+    #cuts up the CDS into exon sequences and stores them in a list
     counter=0
     exonseq_list=[]
     for v in vlist:
-        exonseq_list.append(string[counter:counter+v])
+        exonseq_list.append(CDS[counter:counter+v])
         counter+=v
     return exonseq_list
 
@@ -51,17 +48,17 @@ def writer(target_dict):
         outstring+=(">%s_%d\n%s\n")%(target_dict['Target'],exon_number,exonseq)
     return outstring
 
+
 def main():
-    #args = sys.argv[1:]
-    args=['--in','/Users/josec/Desktop/NudiSilicoTest/Exonerate/Test44/test444out.txt']
+    args = sys.argv[1:]
+    #for testing#args=['--in','/Users/josec/Desktop/NudiSilicoTest/Exonerate/Test44/test444out.txt']
     if not args:
         print usage
         sys.exit(1)
     if args[0] == '--in':
         infile = args[1]
-        del args[0:2]
     outfile_name=infile.replace('.txt','.fa')
-    outfile=open(outfile_name,'a')
+    outfile=open(outfile_name,'w')
     target_list= openfile(infile)
     for target in target_list:
         #check if target is blank
