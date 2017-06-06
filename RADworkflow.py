@@ -27,7 +27,7 @@ def vcftoplink(pwd,basename,baseo,basep,taxon_cov):
     print subprocess.check_output(shlex.split("mv %s_temp.map %s.map"%(basename,baseo)))
     ##Prunes the dataset for LD
     subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --indep-pairwise 50 10 0.1"%(baseo)))
-    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --freq --maf 0.00005 --out %s"%(baseo,basep)))
+    subprocess.check_output(shlex.split("plink2 --file %s --threads 7 --extract plink.prune.in --recode --freq --maf 0.05 --out %s"%(baseo,basep)))
     return
 
 
@@ -47,7 +47,6 @@ def PCAer(pwd,basep):
     grmoutname:      grmjunk
     numthreads:   8
     lsqproject:    YES
-    outliersigmathresh: 10
         """%(basep,basep,basep,basep,basep))
     ### add     outliersigmathresh: 7 if you want more outliers
     pcaoutfile=pwd+basep+'_pcaoutI.txt'
@@ -86,11 +85,11 @@ def Rplot(pwd,basename,type,lowestk,taxon_cov):
         m2=ro.r['m2']
         grdevices.png(file="%s%s_MAP_Pop_%sTC.png"%(pwd,basename,taxon_cov), width=1000, height=1000)
         ro.r('lbound<-c(min(dat$LON),min(dat$LAT));ubound<-c(max(dat$LON),max(dat$LAT));bounds<-c(lbound,ubound);Category<-factor(dat$COI_both);options(warn=-1)')
-        ro.r('map<-get_map(location=bounds,zoom=6,maptype="satellite");options(warn=0)')
+        ro.r('map<-get_map(location=bounds,zoom=7,maptype="satellite");options(warn=0)')
         ro.r('plot(ggmap(map)+ggtitle("Map by Pop")+geom_point(data = dat,aes(LON,LAT,colour=Category,size=1),show.legend=T)+scale_color_brewer(palette="Set3"))')
         grdevices.dev_off()
         ro.r('png("%s%s_PCA_Pop_%sTC.png", width=1000, height=1000)'%(pwd,basename,taxon_cov))
-        ro.r('myplot<-ggplot(m2,aes(x=V2,y=V3,color=factor(COI_both)))+ggtitle("PCA by Pop")+geom_point(size=4,show.legend=T)+scale_color_brewer(palette="Set3")+theme_dark(base_size=16)+labs(x="%s",y="%s")'%(type[0],type[1]))
+        ro.r('myplot<-ggplot(m2,aes(x=V2,y=V3,color=factor(COI_both)))+ggtitle("PCA by Pop")+geom_point(size=4,show.legend=T)+scale_color_brewer(palette="Set3")+theme_light(base_size=16)+labs(x="%s",y="%s")'%(type[0],type[1]))
         ro.r('print(myplot)')
         grdevices.dev_off()
         ro.r('palette(brewer.pal(12,"Set3"))')
@@ -103,7 +102,7 @@ def Rplot(pwd,basename,type,lowestk,taxon_cov):
         ro.r('cvs <- read.table(file="cv.txt",header=FALSE)')
         cvs=ro.r['cvs']
         ro.r('png("CV_plot_%sTC.png", width=1000, height=1000)'%(taxon_cov))
-        ro.r('cvplot<-ggplot(cvs,aes(x=V1,y=V2))+geom_point(size=4)+geom_line(col="red")+theme_dark()+theme(text = element_text(size=20))+labs(x="k",y="CV error",size=4)')
+        ro.r('cvplot<-ggplot(cvs,aes(x=V1,y=V2))+geom_point(size=4)+geom_line(col="red")+theme_light()+theme(text = element_text(size=20))+labs(x="k",y="CV error",size=4)')
         ro.r('print(cvplot)')
         grdevices.dev_off()
         os.chdir(pwd)
@@ -115,7 +114,7 @@ def Rplot(pwd,basename,type,lowestk,taxon_cov):
         ro.r('plot(ggmap(map)+ggtitle("Map by Admixture Group")+geom_point(data = am2,aes(LON,LAT,colour=factor(Sgroup),size=1),show.legend = FALSE)+scale_color_brewer(palette="Accent"))')
         grdevices.dev_off()
         ro.r('png("%s%s_PCA_AdmixGroup_%d_%sTC.png", width=1000, height=1000)'%(admixoutdir,basename,lowestk,taxon_cov))
-        ro.r('myAPCAplot<-ggplot(am2,aes(x=V2,y=V3,color=factor(Sgroup)))+ggtitle("PCA by Admixture K=%s")+geom_point(size=4,show.legend=F)+scale_color_brewer(palette="Accent")+theme_dark(base_size=16)+labs(x="PCA axis 1",y="PCA axis 2")'%(lowestk))
+        ro.r('myAPCAplot<-ggplot(am2,aes(x=V2,y=V3,color=factor(Sgroup)))+ggtitle("PCA by Admixture K=%s")+geom_point(size=4,show.legend=F)+scale_color_brewer(palette="Accent")+theme_light(base_size=16)+labs(x="PCA axis 1",y="PCA axis 2")'%(lowestk))
         ro.r('print(myAPCAplot)')
         grdevices.dev_off()
     return
@@ -244,6 +243,8 @@ def controller(pwd,basename,k,datafile,taxon_cov):
     plotadmix(pwd,basep,lowestk,taxon_cov)
     lowestk=2
     plotadmix(pwd,basep,lowestk,taxon_cov)
+    lowestk=4
+    plotadmix(pwd,basep,lowestk,taxon_cov)
     #output R analysis to Table in case need it in future.
     ro.r("write.table(am2, file='%smergeddataI.txt', quote=FALSE, row.names=FALSE, sep='\t')"%(pwd))
     cleanup(pwd)
@@ -252,12 +253,12 @@ def controller(pwd,basename,k,datafile,taxon_cov):
 def main():
     # pwd=subprocess.check_output(shlex.split('pwd'))
     #basename = raw_input("Enter basename of VCF file:\n")
-    pwd="/Users/josec/Desktop/Planigale/Pt_Pk/"
-    basename="combined"
-    datafile="dat.txt"
+    pwd="/Users/josec/Desktop/marzo/marzo_all/noout_75min_outfiles/"
+    basename="noout_75min"
+    datafile="MarzoSet2.txt"
     loaddata(pwd,datafile)
     #variable you can change...
-    k=4
+    k=10
     bs=10
     taxon_cov=0.75
     controller(pwd,basename,k+1,datafile,taxon_cov)
