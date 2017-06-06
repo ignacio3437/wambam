@@ -1,5 +1,7 @@
 #!/usr/bin/python
 import re
+import sys
+
 
 usage="""
 Usage: VulgarityFilter.py --in exonerate_outfile.txt
@@ -65,7 +67,7 @@ def main():
         if len(target)>2:
             target_dict=parser(target)
             ####Filter to remove low ID hits####
-            if float(target_dict['Percent'])<95:
+            if float(target_dict['Percent'])<98:
                 continue
             outstring=writer(target_dict)
             outfile.write(outstring)
