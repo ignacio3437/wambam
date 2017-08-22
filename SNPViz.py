@@ -1,31 +1,48 @@
 #!/Users/josec/miniconda2/bin/python
-import os
-import re
-import subprocess
-import shutil
-import shlex
-import random
 import glob
 import math
+import os
+import random
+import re
+import shlex
+import shutil
+import subprocess
 
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
+import numpy as np
+import pandas as pd
 import seaborn as sns
+from mpl_toolkits.basemap import Basemap
+
+"""
+SNPViz, an automated workflow that:
+- Reads a VCF file and associated metadata
+- Prunes linked locci and rare alleles from the SNP dataset
+- Removes locci with too much missing data
+- Runs a PCA analysis to assess relatedness between samples
+- Runs Admixture, which estimates the proportion of an individual's ancestries
+- Picks a K value (number of ancestral populations) that best fits the
+    data (i.e. lowest cross-validation error)
+- Generates several figures including:
+        - Map of sample locations and associated metadata (hypothetical groups)
+        - Map of the samples and the estimated proportions of their ancestries
+        - PCA plots colored by their metadata group and Admixture results
+        - A CV plot showing the best value for K
+"""
+
 
 ##############################Set Up##############################
 pwd = "/Users/josec/Desktop/Planigale/So_outfiles/"  # Location of VCF file and Metadata File
 basename = "So"  # Base name of VCF file. (Eg. So.vcf basename = "So")
 datafile = "SoMeta.txt"  # Name of the Metadata.txt in TSV format
 metagroup = "mtDNA population"  # Name of column in Metadata.txt file to group sample by
-k = 6  # Number of K to run the Admixture analysis
+k = 6  # Number of Ks to run the Admixture analysis
 bs = 10  # Number of bootstraps for RaxML analysis
-taxon_cov = 0.90  # If a locus has a sample coverage below this number it will be thrown out.
-threads = 7
+taxon_cov = 0.90  # If a locus percent missing data is below this number, it will be thrown out
+threads = 7 # Number of cores to run the analysis
 mapbuffer = 4  # Lat/Lon buffer to zoom out of box containing geographic distribution of samples
-mapquality = False  # Set quality of output files 'high'=TRUE 'low'=FALSE
-outlierbutton = "outliersigmathresh: 7"  # Add "outliersigmathresh: 7" if you want more outliers "" if you want less
+pretty_figures = False  # Set quality of output files 'high'=TRUE 'low'=FALSE
+outlierbutton = "outliersigmathresh: 7"  # Add "outliersigmathresh: 7" if you want more outliers, set to "" if you want outliers removed
 ##################################################################
 
 # Set Global variables
@@ -37,8 +54,8 @@ pcafile = '%s%s.evec' % (pwd, basename)
 admixoutdir = pwd + "admixture/"
 admix_colorpalette_list = sns.color_palette('Dark2', 8).as_hex()
 colorpalette_list = sns.color_palette('Set1', 8).as_hex()
-# Make high quality figures or low
-if mapquality:
+# Make high quality figures?
+if pretty_figures:
     dpi, xpix, imgformat = 1200, 3000, '.svg'
 else:
     dpi, xpix, imgformat = 300, 1000, '.png'
@@ -164,7 +181,7 @@ def MapSetUp(datatable):
     # Bounding box for map
     lllat, lllon = (min(lats) - mapbuffer + 1), (min(lons) - mapbuffer)
     urlat, urlon = (max(lats) + mapbuffer - 1), (max(lons) + mapbuffer)
-    # Generate the map with (australia=3577,mercator=3395) projection. Resolution set by mapquality variable
+    # Generate the map with (australia=3577,mercator=3395) projection. Resolution set by pretty_figures variable
     # Flag this for further work. Why does epsg change the size of the map???? For now leave on 3577...
     m = Basemap(
         epsg=3577,
@@ -380,7 +397,7 @@ def DirectoryCleaner(pwd):
 
 def Controller(k):
     # Engine for the workflow
-    # Comment out steps to skip them.################
+    ################ Comment out steps to skip them.################
     os.chdir(pwd)
     VcfToPlink(baseo)
     global pcaaxis
@@ -389,21 +406,18 @@ def Controller(k):
     PCAPlotter('M1', metagroup, colorpalette_list)
     SampleMapPlotter()
     lowestk = AdmixtureSetUp(k)
-    lowestk = 2
     PlotAdmix(lowestk)
     # Plot with lowestk then plot forcing k=2
-    lowestk = 3
-    PlotAdmix(lowestk)
-    lowestk = 4
-    PlotAdmix(lowestk)
-    # Raxer(pwd,basename,bs)
+    # lowestk = 2
+    # PlotAdmix(lowestk)
+    Raxer(pwd,basename,bs)
     DirectoryCleaner(pwd)
     return
 
 
 def main():
     Controller(k)
-    print "\n\nALLDone"
+    print "\n\nAll done!"
     return
 
 
