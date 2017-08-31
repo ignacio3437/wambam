@@ -47,8 +47,7 @@ outlierbutton = "outliersigmathresh: 7"  # Add "outliersigmathresh: 7" if you wa
 
 # Set Global variables
 datafile = pd.read_table(
-    "%s%s" % (pwd, datafile), dtype={'Sample': object,
-                                     'COI_both': object})
+    "%s%s" % (pwd, datafile), dtype={'Sample': object})
 baseo = '%s_o' % (basename)
 pcafile = '%s%s.evec' % (pwd, basename)
 admixoutdir = pwd + "admixture/"
@@ -153,6 +152,7 @@ def PCApreper():
 def PCAPlotter(df, colorby, colorpalette):
     # Plot PCA plot, colored by metagroup, axis are percent variation
     datatable = pd.read_csv('%s%s%s.csv' % (pwd, basename, df))
+    datatable=datatable.sort_values(metagroup)
     sns.set_palette(colorpalette)
     pcapplot = sns.lmplot(
         'Eigen1',
@@ -200,8 +200,12 @@ def SampleMapPlotter():
     plt.title('Location of Samples', fontsize=12)
     m = MapSetUp(datatable)
     # Loop through each of the metagroups and plot points on map with different color
-    metacategories = set(datatable[metagroup].tolist())
-    for i, mgroup in enumerate(metacategories):
+    # Sort to make the colors the same in all of the graphs
+    datatable=datatable.sort_values(metagroup)
+    metacategories = datatable[metagroup].tolist()
+    noDupes = []
+    [noDupes.append(i) for i in metacategories if not noDupes.count(i)]
+    for i, mgroup in enumerate(noDupes):
         mtable = datatable.loc[datatable[metagroup] == mgroup]
         sublats = mtable['LAT'].tolist()
         sublons = mtable['LON'].tolist()
@@ -253,6 +257,7 @@ def AdmixtureSetUp(k):
     # Set up the folder that admixture will run in and move input files to it
     print "\n\n\n\nstart admixture"
     os.chdir(pwd)
+    # Make admixoutdir and add files to it
     if not os.path.exists(admixoutdir):
         os.mkdir(admixoutdir)
     # Input files for admixture all have "_o." in filename
@@ -338,7 +343,7 @@ def MapAdmix(lowestk):
 def CVPloter(cvd):
     # Plot the admixture CV error results as a lineplot.
     plt.title('CV error for different K values', fontsize=8)
-    xlist = [str(x) for x in cvd.keys()]
+    xlist = [int(x) for x in cvd.keys()]
     ylist = [float(y) for y in cvd.values()]
     sns.pointplot(xlist, ylist)
     plt.savefig("%s%s_CVplot%s" % (pwd, basename, imgformat), dpi=dpi)
