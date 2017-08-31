@@ -17,7 +17,7 @@ from mpl_toolkits.basemap import Basemap
 """
 SNPViz, an automated workflow that:
 - Reads a VCF file and associated metadata
-- Prunes linked locci and rare alleles from the SNP dataset
+- Prunes linked locci from the SNP dataset
 - Removes locci with too much missing data
 - Runs a PCA analysis to assess relatedness between samples
 - Runs Admixture, which estimates the proportion of an individual's ancestries
@@ -32,23 +32,22 @@ SNPViz, an automated workflow that:
 
 
 ##############################Set Up##############################
-pwd = "/Users/josec/Desktop/Planigale/So_outfiles/"  # Location of VCF file and Metadata File
-basename = "So"  # Base name of VCF file. (Eg. So.vcf basename = "So")
-datafile = "SoMeta.txt"  # Name of the Metadata.txt in TSV format
-metagroup = "mtDNA population"  # Name of column in Metadata.txt file to group sample by
-k = 6  # Number of Ks to run the Admixture analysis
+pwd = "/Users/josec/Desktop/Testing/"  # Location of VCF file and Metadata File
+basename = "Sy"  # Base name of VCF file. (Eg. So.vcf basename = "So")
+datafile = "Sy_data.txt"  # Name of the Metadata.txt in TSV format
+metagroup = "dummy"  # Name of column in Metadata.txt file to group sample by
+k = 2  # Number of Ks to run the Admixture analysis
 bs = 10  # Number of bootstraps for RaxML analysis
-taxon_cov = 0.90  # If a locus percent missing data is below this number, it will be thrown out
+taxon_cov = 0.8  # If a locus percent missing data is below this number, it will be thrown out
 threads = 7 # Number of cores to run the analysis
 mapbuffer = 4  # Lat/Lon buffer to zoom out of box containing geographic distribution of samples
 pretty_figures = False  # Set quality of output files 'high'=TRUE 'low'=FALSE
-outlierbutton = "outliersigmathresh: 7"  # Add "outliersigmathresh: 7" if you want more outliers, set to "" if you want outliers removed
+outlierbutton = ""  # Add "outliersigmathresh: 8" if you want outliers included, set to "" if you want outliers removed
 ##################################################################
 
 # Set Global variables
 datafile = pd.read_table(
-    "%s%s" % (pwd, datafile), dtype={'Sample': object,
-                                     'COI_both': object})
+    "%s%s" % (pwd, datafile), dtype={'Sample': object})
 baseo = '%s_o' % (basename)
 pcafile = '%s%s.evec' % (pwd, basename)
 admixoutdir = pwd + "admixture/"
@@ -62,27 +61,15 @@ else:
 
 
 def VcfToPlink(baseo):
-    # hanges from the VCF output from pyrad to a plink file that has been cleaned up for LD and Taxon_coverate (missing data)
-    subprocess.check_output(
-        shlex.split("vcftools --vcf %s.vcf --max-missing %.2f --out %s --plink"
-                    % (basename, taxon_cov, baseo)))
+    # Changes from the VCF output from pyrad to a plink file
+    # Linked locci are removed by passing --thin. This selects one SNP per locci
+    # Assuming that locci are max 1000 bp long
+    # Locci with missing data are removed with --max-missing
+    subprocess.check_output(shlex.split("vcftools --vcf %s.vcf --thin 1000 --max-missing %f --out %s --plink" % (basename, taxon_cov, basename)))
     # Replace first column of map file to 1 to avoid errors concening too many Chromosomes in plink.
     # Plink treats each locci as a chromosome with the way the map file is encoded. This sets all locci on Chrom1
     # This does not affect anything because we are not doing any chromosomal analysis. Just analyzing a SNP dataset.
-    with open("%s_temp.map" % (basename), "w") as outfile:
-        subprocess.call(
-            shlex.split("awk '$1=1' %s.map" % (baseo)), stdout=outfile)
-    print subprocess.check_output(
-        shlex.split("mv %s_temp.map %s.map" % (basename, baseo)))
-    # Prunes the dataset for LD with indep-pairwise
-    # Removes locci with minimum allele freq of under 5% with maf. (ie removes fixed alleles)
-    subprocess.check_output(
-        shlex.split("plink2 --file %s --threads %d --indep-pairwise 50 10 0.1" %
-                    (baseo, threads)))
-    subprocess.check_output(
-        shlex.split(
-            "plink2 --file %s --threads %d --extract plink.prune.in --recode --freq --maf 0.05 --out %s"
-            % (baseo, threads, basename)))
+    subprocess.check_output(shlex.split("sed -ie 's/^0/1/' %s.map" % (basename)))
     return
 
 
@@ -153,6 +140,7 @@ def PCApreper():
 def PCAPlotter(df, colorby, colorpalette):
     # Plot PCA plot, colored by metagroup, axis are percent variation
     datatable = pd.read_csv('%s%s%s.csv' % (pwd, basename, df))
+    datatable=datatable.sort_values(metagroup)
     sns.set_palette(colorpalette)
     pcapplot = sns.lmplot(
         'Eigen1',
@@ -191,6 +179,9 @@ def MapSetUp(datatable):
         urcrnrlon=urlon)
     m.arcgisimage(
         service='ESRI_Imagery_World_2D', xpixels=xpix, verbose=True, dpi=dpi)
+    # If antarctic data use this. Not as nice....
+    # m = Basemap(projection='spstere',boundinglat=-60,lon_0=45,resolution='h')
+    # m.drawcoastlines(zorder=0,linewidth=0.5)
     return m
 
 
@@ -200,8 +191,12 @@ def SampleMapPlotter():
     plt.title('Location of Samples', fontsize=12)
     m = MapSetUp(datatable)
     # Loop through each of the metagroups and plot points on map with different color
-    metacategories = set(datatable[metagroup].tolist())
-    for i, mgroup in enumerate(metacategories):
+    # Sort to make the colors the same in all of the graphs
+    datatable=datatable.sort_values(metagroup)
+    metacategories = datatable[metagroup].tolist()
+    noDupes = []
+    [noDupes.append(i) for i in metacategories if not noDupes.count(i)]
+    for i, mgroup in enumerate(noDupes):
         mtable = datatable.loc[datatable[metagroup] == mgroup]
         sublats = mtable['LAT'].tolist()
         sublons = mtable['LON'].tolist()
@@ -226,7 +221,7 @@ def AdmixtureRunner(k):
     # CV is the cross validation error. The lowest CV value represents the best k.
     cvd = {}
     for x in range(1, k + 1):
-        admixcommand = shlex.split("admixture -j%d -C=0.01 --cv %s.bed %d" %
+        admixcommand = shlex.split("admixture -j%d -C=0.01 --cv=10 %s.bed %d" %
                                    (threads, basename, x))
         popen = subprocess.Popen(
             admixcommand, stdout=subprocess.PIPE, universal_newlines=True)
@@ -253,10 +248,10 @@ def AdmixtureSetUp(k):
     # Set up the folder that admixture will run in and move input files to it
     print "\n\n\n\nstart admixture"
     os.chdir(pwd)
+    # Make admixoutdir and add files to it
     if not os.path.exists(admixoutdir):
         os.mkdir(admixoutdir)
-    # Input files for admixture all have "_o." in filename
-    for file in glob.glob(r"*_o*"):
+    for file in glob.glob(r"*%s*"%(basename)):
         shutil.copy(file, admixoutdir)
     os.chdir(admixoutdir)
     # Remove outliers from PCA from input files for Admixture analysis if present and make input files for Admixture.
@@ -265,14 +260,9 @@ def AdmixtureSetUp(k):
     with open(outlierfile, 'r') as outlierhandle:
         outlierlist = outlierhandle.readlines()
     if len(outlierlist) > 0:
-        subprocess.check_output(
-            shlex.split(
-                "plink2 --threads %d --file %s_o --make-bed --remove %s --out %s"
-                % (threads, basename, outlierfile, basename)))
+        subprocess.check_output(shlex.split("plink2 --file %s --remove %s --recode --make-bed --out %s" % (basename, outlierfile, basename)))
     else:
-        subprocess.check_output(
-            shlex.split("plink2 --threads %d --file %s_o --make-bed --out %s" %
-                        (threads, basename, basename)))
+        subprocess.check_output(shlex.split("plink2 --file %s --recode --make-bed --out %s" % (basename, basename)))
     # Run admixture for each k 1->"k". cvd=dictionary for CV values for each K of admixture.
     cvd = AdmixtureRunner(k)
     # Pick lowest K based on CV error minimum
@@ -338,7 +328,7 @@ def MapAdmix(lowestk):
 def CVPloter(cvd):
     # Plot the admixture CV error results as a lineplot.
     plt.title('CV error for different K values', fontsize=8)
-    xlist = [str(x) for x in cvd.keys()]
+    xlist = [int(x) for x in cvd.keys()]
     ylist = [float(y) for y in cvd.values()]
     sns.pointplot(xlist, ylist)
     plt.savefig("%s%s_CVplot%s" % (pwd, basename, imgformat), dpi=dpi)
@@ -351,14 +341,15 @@ def PlotAdmix(lowestk):
     os.chdir(admixoutdir)
     # File Paths
     qfile = '%s%s.%d.Q' % (admixoutdir, basename, lowestk)
-    sampleorderfile = '%s%s.nosex' % (admixoutdir, basename)
+    sampleorderfile = '%s%s.fam' % (admixoutdir, basename)
     datafile = '%s%sM1.csv' % (pwd, basename)
     # Read the Plink file to get the sample names to assign to the admixture analysis
     with open(sampleorderfile, 'r') as sampleorder_handle:
-        samplelist = [x.split('\t')[0] for x in sampleorder_handle.readlines()]
+        samplelist = [x.split(' ')[0] for x in sampleorder_handle.readlines()]
     # Combine with metadata into one table joining on the sample index
     qdf = pd.read_table(qfile, header=None, sep='\s', engine='python')
     ddf = pd.read_csv(datafile, index_col=1)
+    ddf=ddf.sort_values(metagroup)
     qdf.index = samplelist
     # Set the index as a string to make sure they join correctly.Then save
     qdf.index = qdf.index.map(str)
@@ -406,11 +397,11 @@ def Controller(k):
     PCAPlotter('M1', metagroup, colorpalette_list)
     SampleMapPlotter()
     lowestk = AdmixtureSetUp(k)
-    PlotAdmix(lowestk)
-    # Plot with lowestk then plot forcing k=2
-    # lowestk = 2
     # PlotAdmix(lowestk)
-    Raxer(pwd,basename,bs)
+    # Plot with lowestk then plot forcing k=2
+    lowestk = 2
+    PlotAdmix(lowestk)
+    # Raxer(pwd,basename,bs)
     DirectoryCleaner(pwd)
     return
 
