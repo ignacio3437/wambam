@@ -15,6 +15,7 @@ import seaborn as sns
 from mpl_toolkits.basemap import Basemap
 
 """
+THIN
 SNPViz, an automated workflow that:
 - Reads a VCF file and associated metadata
 - Prunes linked locci from the SNP dataset
