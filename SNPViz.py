@@ -1,9 +1,10 @@
-#!/Users/josec/miniconda2/bin/python
+#!python3
 import glob
 import math
 import os
 import random
 import re
+import sh
 import shlex
 import shutil
 import subprocess
@@ -12,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from io import StringIO
 from mpl_toolkits.basemap import Basemap
 
 """
@@ -32,8 +34,8 @@ SNPViz, an automated workflow that:
 
 
 ##############################Set Up##############################
-pwd = "/Users/josec/Desktop/Planigale/So_outfiles/"  # Location of VCF file and Metadata File
-basename = "So"  # Base name of VCF file. (Eg. So.vcf basename = "So")
+pwd = "/Users/josec/Desktop/Testing/So_AGRF/"  # Location of VCF file and Metadata File
+basename = "So_AGRF"  # Base name of VCF file. (Eg. So.vcf basename = "So")
 datafile = "SoMeta.txt"  # Name of the Metadata.txt in TSV format
 metagroup = "mtDNA population"  # Name of column in Metadata.txt file to group sample by
 k = 6  # Number of Ks to run the Admixture analysis
@@ -46,11 +48,10 @@ outlierbutton = "outliersigmathresh: 7"  # Add "outliersigmathresh: 7" if you wa
 ##################################################################
 
 # Set Global variables
-datafile = pd.read_table(
-    "%s%s" % (pwd, datafile), dtype={'Sample': object})
-baseo = '%s_o' % (basename)
-pcafile = '%s%s.evec' % (pwd, basename)
-admixoutdir = pwd + "admixture/"
+datafile = pd.read_table(f'{pwd}{datafile}', dtype={'Sample': object})
+baseo = f'{basename}_o'
+pcafile = f'{pwd}{basename}.evec'
+admixoutdir = f'{pwd}admixture/'
 admix_colorpalette_list = sns.color_palette('Dark2', 8).as_hex()
 colorpalette_list = sns.color_palette('Set1', 8).as_hex()
 # Make high quality figures?
@@ -60,28 +61,19 @@ else:
     dpi, xpix, imgformat = 300, 1000, '.png'
 
 
-def VcfToPlink(baseo):
+def vcf_to_plink(baseo):
     # hanges from the VCF output from pyrad to a plink file that has been cleaned up for LD and Taxon_coverate (missing data)
-    subprocess.check_output(
-        shlex.split("vcftools --vcf %s.vcf --max-missing %.2f --out %s --plink"
-                    % (basename, taxon_cov, baseo)))
+    sh.vcftools(shlex.split(f"--vcf {basename}.vcf --max-missing {taxon_cov} --out {baseo} --plink"))
     # Replace first column of map file to 1 to avoid errors concening too many Chromosomes in plink.
     # Plink treats each locci as a chromosome with the way the map file is encoded. This sets all locci on Chrom1
     # This does not affect anything because we are not doing any chromosomal analysis. Just analyzing a SNP dataset.
-    with open("%s_temp.map" % (basename), "w") as outfile:
-        subprocess.call(
-            shlex.split("awk '$1=1' %s.map" % (baseo)), stdout=outfile)
-    print subprocess.check_output(
-        shlex.split("mv %s_temp.map %s.map" % (basename, baseo)))
+    maphandle=f"{basename}_temp.map"
+    sh.awk("$1=1", f"{baseo}.map", _out=maphandle)
+    sh.mv(f"{basename}_temp.map",f"{baseo}.map")
     # Prunes the dataset for LD with indep-pairwise
     # Removes locci with minimum allele freq of under 5% with maf. (ie removes fixed alleles)
-    subprocess.check_output(
-        shlex.split("plink2 --file %s --threads %d --indep-pairwise 50 10 0.1" %
-                    (baseo, threads)))
-    subprocess.check_output(
-        shlex.split(
-            "plink2 --file %s --threads %d --extract plink.prune.in --recode --freq --maf 0.05 --out %s"
-            % (baseo, threads, basename)))
+    sh.plink2(shlex.split(f"--file {baseo} --threads {threads} --indep-pairwise 50 10 0.1"))
+    sh.plink2(shlex.split(f"--file {baseo} --threads {threads} --extract plink.prune.in --recode --freq --maf 0.05 --out {basename}"))
     return
 
 
@@ -89,26 +81,27 @@ def PCAer():
     # Sets up a pca.parameter file for eigenstrat and runs it, then sends it to be plotted in R.
     # Converts the eigenvalues to percent Variation for top axis. This axis will show percent variation for each PCA axis.
     with open(pwd + 'pca.par', 'w') as pca:
-        pca.write("""
-    genotypename:    %s.ped
-    snpname:         %s.map
-    indivname:       %s.ped
-    evecoutname:     %s.evec
-    evaloutname:     %s.eval
+        pca.write(f"""
+    genotypename:    {basename}.ped
+    snpname:         {basename}.map
+    indivname:       {basename}.ped
+    evecoutname:     {basename}.evec
+    evaloutname:     {basename}.eval
     altnormstyle:    YES
     numoutevec:      3
     familynames:     NO
     grmoutname:      grmjunk
-    numthreads:   %d
+    numthreads:   {threads}
     lsqproject:    YES
-    %s
-        """ % (basename, basename, basename, basename, basename, threads,
-               outlierbutton))
-    pcaoutfile = pwd + basename + '_pcaoutI.txt'
-    pcaout = subprocess.check_output(shlex.split("smartpca -p pca.par"))
-    with open(pcaoutfile, 'w') as pcaoutfile:
-        pcaoutfile.write(pcaout)
-    # Pull out eigenvalues and P values from 4 lines starting with Tracy-Widom.
+    {outlierbutton}
+        """)
+    pcaouthandle = open(f"{pwd} + {basename} + _pcaoutI.txt",'w')
+    pcabuf = StringIO()
+    sh.smartpca("-p","pca.par", _out=pcabuf)
+    pcaout = pcabuf.getvalue()
+    pcaouthandle.write(pcaout)
+    pcaouthandle.close
+    # Pull out eigenvalues and P values from 4 lines starting with "Tracy-Widom".
     lines = re.findall(r"Tracy-Widom(.*)\s.*\s(.*)\s(.*)", pcaout)[0]
     eigsum = lines[0].split()[2]
     eigens = (lines[1].split()[1], lines[2].split()[1])
@@ -127,12 +120,11 @@ def PCAer():
     with open(pwd + basename + '_outliersI.txt', 'w') as outlierfile:
         for outlier in outliers:
             outlierfile.write(outlier + '\t' + outlier + '\n')
-    print "There are %d outliers in PCA analysis of %s\n\n\n\n" % (
-        len(outliers), basename)
+    print(f"There are {len(outliers)} outliers in PCA analysis of {basename}\n\n\n\n")
     return pcaaxis
 
 
-def PCApreper():
+def pca_prepper():
     # Store the PCA results in dataframe
     evectable = pd.read_table(
         "%s%s.evec" % (pwd, basename),
@@ -149,7 +141,7 @@ def PCApreper():
     return
 
 
-def PCAPlotter(df, colorby, colorpalette):
+def pca_plotter(df, colorby, colorpalette):
     # Plot PCA plot, colored by metagroup, axis are percent variation
     datatable = pd.read_csv('%s%s%s.csv' % (pwd, basename, df))
     datatable=datatable.sort_values(metagroup)
@@ -194,7 +186,7 @@ def MapSetUp(datatable):
     return m
 
 
-def SampleMapPlotter():
+def sample_map_plotter():
     # Plot Map with samples colored by metagroup
     datatable = pd.read_csv('%sM1.csv' % (basename))
     plt.title('Location of Samples', fontsize=12)
@@ -223,10 +215,10 @@ def SampleMapPlotter():
     return
 
 
-def AdmixtureRunner(k):
+def admix_runner(k):
     # Runs Admixture program. Uses popout so that it will automatically terminate if admixutre
     # Hangs with "nan" at CV step. This then exits the program. Results are writen to admixout.txt
-    # The CVD is a dictionary that stores each CV value to be called in AdmixtureSetUp.
+    # The CVD is a dictionary that stores each CV value to be called in admix_set_up.
     # CV is the cross validation error. The lowest CV value represents the best k.
     cvd = {}
     for x in range(1, k + 1):
@@ -248,14 +240,14 @@ def AdmixtureRunner(k):
             return_code = popen.wait()
             if return_code:
                 raise subprocess.CalledProcessError(return_code, admixcommand)
-        print "Admixture: Finished K=%d" % (x)
+        print(f"Admixture: Finished K={x}")
     return cvd
 
 
-def AdmixtureSetUp(k):
+def admix_set_up(k):
     # Run admixture in new directory for range(1,k), keeps track of CV values to plot,
     # Set up the folder that admixture will run in and move input files to it
-    print "\n\n\n\nstart admixture"
+    print("\n\n\n\nstart admixture")
     os.chdir(pwd)
     # Make admixoutdir and add files to it
     if not os.path.exists(admixoutdir):
@@ -279,12 +271,12 @@ def AdmixtureSetUp(k):
             shlex.split("plink2 --threads %d --file %s_o --make-bed --out %s" %
                         (threads, basename, basename)))
     # Run admixture for each k 1->"k". cvd=dictionary for CV values for each K of admixture.
-    cvd = AdmixtureRunner(k)
+    cvd = admix_runner(k)
     # Pick lowest K based on CV error minimum
     lowestk = min(cvd, key=cvd.get)
     # Plot the CV results
-    CVPloter(cvd)
-    print "Best value for K is %s" % (lowestk)
+    cv_plotter(cvd)
+    print(f"Best value for K is {lowestk}")
     return lowestk
 
 
@@ -313,7 +305,7 @@ def draw_pie(ax, ratios, X, Y, size):
     return
 
 
-def MapAdmix(lowestk):
+def map_admix(lowestk):
     # Plot the admix results as piecharts and put each sample on a map
     datadfM2 = pd.read_csv('%s%sM2.csv' % (pwd, basename), index_col=0)
     # Set up Map
@@ -340,7 +332,7 @@ def MapAdmix(lowestk):
     return
 
 
-def CVPloter(cvd):
+def cv_plotter(cvd):
     # Plot the admixture CV error results as a lineplot.
     plt.title('CV error for different K values', fontsize=8)
     xlist = [int(x) for x in cvd.keys()]
@@ -351,7 +343,7 @@ def CVPloter(cvd):
     return
 
 
-def PlotAdmix(lowestk):
+def plot_admixture(lowestk):
     # Plots admixture results as a map, 'structure plot', and CV plot.
     os.chdir(admixoutdir)
     # File Paths
@@ -371,23 +363,20 @@ def PlotAdmix(lowestk):
     datadfM2 = ddf.join(qdf, how='inner')
     datadfM2.to_csv('%s%sM2.csv' % (pwd, basename))
     # Plot the admix results as piecharts and put each sample on a map
-    MapAdmix(lowestk)
+    map_admix(lowestk)
     # Plot the PCA colored by Admix results
-    PCAPlotter('M3_%d' % (lowestk), 'AdmixGroup', admix_colorpalette_list)
+    pca_plotter('M3_%d' % (lowestk), 'AdmixGroup', admix_colorpalette_list)
     return
 
 
-def Raxer(pwd, basename, bs):
+def raxer(pwd, basename, bs):
     # Print subprocess.check_output(shlex.split("raxmlHPC-PTHREADS-SSE3 -T 8 -f a -n %s -s %s.phy -x %d -N %d -m GTRCAT -p %d"%(basename,basename,random.randint(0,999999),bs,random.randint(0,999999))))
-    print "raxmlHPC-PTHREADS-SSE3 -T %d -f a -n %s -s %s.phy -x %d -N %d -m GTRCAT -p %d" % (
-        threads, basename, basename, random.randint(0, 999999), bs,
-        random.randint(0, 999999))
-    print "raxmlHPC-PTHREADS-SSE3 -T %d -f x -n %s -s %s.phy -m GTRCAT -p %d" % (
-        threads, basename, basename, random.randint(0, 999999))
+    print(f"raxmlHPC-PTHREADS-SSE3 -T {threads} -f a -n {basename} -s {basename}.phy -x {random.randint(0,999999)} -N {bs} -m GTRCAT -p {random.randint(0,999999)}")
+    print(f"raxmlHPC-PTHREADS-SSE3 -T {threads} -f x -n {basename} -s {basename}.phy -m GTRCAT -p {random.randint(0, 999999)}")
     return
 
 
-def DirectoryCleaner(pwd):
+def directory_cleaner(pwd):
     # Moves important files to Analysis directory and figures to figure Directory.
     figpath = pwd + "figures/"
     if not os.path.exists(figpath):
@@ -400,29 +389,29 @@ def DirectoryCleaner(pwd):
     return
 
 
-def Controller(k):
+def controller(k):
     # Engine for the workflow
     ################ Comment out steps to skip them.################
     os.chdir(pwd)
-    VcfToPlink(baseo)
+    vcf_to_plink(baseo)
     global pcaaxis
     pcaaxis = PCAer()
-    PCApreper()
-    PCAPlotter('M1', metagroup, colorpalette_list)
-    SampleMapPlotter()
-    lowestk = AdmixtureSetUp(k)
-    PlotAdmix(lowestk)
+    pca_prepper()
+    pca_plotter('M1', metagroup, colorpalette_list)
+    sample_map_plotter()
+    lowestk = admix_set_up(k)
+    plot_admixture(lowestk)
     # Plot with lowestk then plot forcing k=2
     # lowestk = 2
-    # PlotAdmix(lowestk)
-    Raxer(pwd,basename,bs)
-    DirectoryCleaner(pwd)
+    # plot_admixture(lowestk)
+    raxer(pwd,basename,bs)
+    directory_cleaner(pwd)
     return
 
 
 def main():
-    Controller(k)
-    print "\n\nAll done!"
+    controller(k)
+    print("\n\nAll done!")
     return
 
 
