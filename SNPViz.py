@@ -48,9 +48,10 @@ outlierbutton = "outliersigmathresh: 7"  # Add "outliersigmathresh: 7" if you wa
 ##################################################################
 
 # Set Global variables
-datafile = pd.read_table(f'{pwd}{datafile}', dtype={'Sample': object})
+datafile = pd.read_table(f'{pwd + datafile}', dtype={'Sample': object})
 baseo = f'{basename}_o'
-pcafile = f'{pwd}{basename}.evec'
+basepath = f'{pwd+basename}'
+pcafile = f'{basepath}.evec'
 admixoutdir = f'{pwd}admixture/'
 admix_colorpalette_list = sns.color_palette('Dark2', 8).as_hex()
 colorpalette_list = sns.color_palette('Set1', 8).as_hex()
@@ -95,7 +96,9 @@ def PCAer():
     lsqproject:    YES
     {outlierbutton}
         """)
-    pcaouthandle = open(f"{pwd} + {basename} + _pcaoutI.txt",'w')
+    pcaouthandle = open(f"{basepath}_pcaoutI.txt",'w')
+    #run smartpca and save output to pcaoutI.txt
+    #Keep the output in memory with StringIO so that we can regex it too
     pcabuf = StringIO()
     sh.smartpca("-p","pca.par", _out=pcabuf)
     pcaout = pcabuf.getvalue()
@@ -117,7 +120,7 @@ def PCAer():
         outliers = re.findall(r'REMOVED outlier (\w*)', pcaout)
     else:
         outliers = []
-    with open(pwd + basename + '_outliersI.txt', 'w') as outlierfile:
+    with open(basepath + '_outliersI.txt', 'w') as outlierfile:
         for outlier in outliers:
             outlierfile.write(outlier + '\t' + outlier + '\n')
     print(f"There are {len(outliers)} outliers in PCA analysis of {basename}\n\n\n\n")
@@ -127,7 +130,7 @@ def PCAer():
 def pca_prepper():
     # Store the PCA results in dataframe
     evectable = pd.read_table(
-        "%s%s.evec" % (pwd, basename),
+        f"{basepath}.evec",
         skiprows=1,
         header=None,
         sep='\s*',
@@ -137,13 +140,13 @@ def pca_prepper():
     datatable = pd.merge(datafile, evectable, on='Sample', how='outer')
     # Remove entries with no metagroup assigned.
     datatable = datatable.dropna(subset=[metagroup], how='all')
-    datatable.to_csv('%s%sM1.csv' % (pwd, basename))
+    datatable.to_csv(f'{basepath}M1.csv')
     return
 
 
 def pca_plotter(df, colorby, colorpalette):
     # Plot PCA plot, colored by metagroup, axis are percent variation
-    datatable = pd.read_csv('%s%s%s.csv' % (pwd, basename, df))
+    datatable = pd.read_csv(f'{basepath + df}.csv')
     datatable=datatable.sort_values(metagroup)
     sns.set_palette(colorpalette)
     pcapplot = sns.lmplot(
@@ -160,8 +163,7 @@ def pca_plotter(df, colorby, colorpalette):
                      's': 25})
     pcapplot = (pcapplot.set_axis_labels(pcaaxis[0], pcaaxis[1]))
     plt.title('PCA plot', fontsize=8)
-    pcapplot.savefig(
-        '%s%s_PCA_%s_%s%s' % (pwd, basename, colorby, df, imgformat), dpi=dpi)
+    pcapplot.savefig(f"{basepath}_PCA_{colorby}_{df + imgformat}",dpi=dpi)
     plt.clf()
     return
 
@@ -175,22 +177,22 @@ def MapSetUp(datatable):
     urlat, urlon = (max(lats) + mapbuffer - 1), (max(lons) + mapbuffer)
     # Generate the map with (australia=3577,mercator=3395) projection. Resolution set by pretty_figures variable
     # Flag this for further work. Why does epsg change the size of the map???? For now leave on 3577...
-    m = Basemap(
+    basemap_obj = Basemap(
         epsg=3577,
         llcrnrlat=lllat,
         urcrnrlat=urlat,
         llcrnrlon=lllon,
         urcrnrlon=urlon)
-    m.arcgisimage(
+    basemap_obj.arcgisimage(
         service='ESRI_Imagery_World_2D', xpixels=xpix, verbose=True, dpi=dpi)
-    return m
+    return basemap_obj
 
 
 def sample_map_plotter():
     # Plot Map with samples colored by metagroup
-    datatable = pd.read_csv('%sM1.csv' % (basename))
+    datatable = pd.read_csv(f'{basename}M1.csv')
     plt.title('Location of Samples', fontsize=12)
-    m = MapSetUp(datatable)
+    basemap_obj = MapSetUp(datatable)
     # Loop through each of the metagroups and plot points on map with different color
     # Sort to make the colors the same in all of the graphs
     datatable=datatable.sort_values(metagroup)
@@ -201,8 +203,8 @@ def sample_map_plotter():
         mtable = datatable.loc[datatable[metagroup] == mgroup]
         sublats = mtable['LAT'].tolist()
         sublons = mtable['LON'].tolist()
-        x, y = m(sublons, sublats)
-        m.scatter(
+        x, y = basemap_obj(sublons, sublats)
+        basemap_obj.scatter(
             x,
             y,
             linewidths=.1,
@@ -210,37 +212,35 @@ def sample_map_plotter():
             c=colorpalette_list[i],
             marker='o',
             s=8)
-    plt.savefig("%s%s_MAP_Pop%s" % (pwd, basename, imgformat), dpi=dpi)
+    plt.savefig(f"{basepath}_MAP_Pop{imgformat}", dpi=dpi)
     plt.clf()
     return
 
 
 def admix_runner(k):
     # Runs Admixture program. Uses popout so that it will automatically terminate if admixutre
-    # Hangs with "nan" at CV step. This then exits the program. Results are writen to admixout.txt
+    # If admixture hangs it will exit. This is the if "nan" statement
+    # Results are writen to admixout.txt
     # The CVD is a dictionary that stores each CV value to be called in admix_set_up.
     # CV is the cross validation error. The lowest CV value represents the best k.
     cvd = {}
-    for x in range(1, k + 1):
-        admixcommand = shlex.split("admixture -j%d -C=0.01 --cv %s.bed %d" %
-                                   (threads, basename, x))
-        popen = subprocess.Popen(
-            admixcommand, stdout=subprocess.PIPE, universal_newlines=True)
+    for ki in range(1, k + 1):
+        admixcommand = shlex.split(f"admixture -j{threads} -C=0.01 --cv {basename}.bed {ki}")
+        popen = subprocess.Popen(admixcommand, stdout=subprocess.PIPE, universal_newlines=True)
         with open(admixoutdir + "admixout.txt", 'a') as admixoutfile:
-            admixoutfile.write(
-                "####################K=%s\n####################\n" % (x))
+            admixoutfile.write(f"{'#'*10}K={ki}\n{'#'*10}\n")
             for stdout_line in iter(popen.stdout.readline, ""):
                 admixoutfile.write(stdout_line)
                 if "nan" in stdout_line:
                     return
                 elif "CV" in stdout_line:
                     cv = re.findall(r'CV .*K=(\d*).*: (\d*\.\d*)', stdout_line)
-                    cvd[x] = cv[0][1]
+                    cvd[ki] = cv[0][1]
             popen.stdout.close()
             return_code = popen.wait()
             if return_code:
                 raise subprocess.CalledProcessError(return_code, admixcommand)
-        print(f"Admixture: Finished K={x}")
+        print(f"Admixture: Finished K={ki}")
     return cvd
 
 
@@ -261,15 +261,14 @@ def admix_set_up(k):
     outlierfile = basename + "_outliersI.txt"
     with open(outlierfile, 'r') as outlierhandle:
         outlierlist = outlierhandle.readlines()
+    plink_string=f"--threads {threads} --file {basename}_o --make-bed --out {basename}"
     if len(outlierlist) > 0:
-        subprocess.check_output(
-            shlex.split(
-                "plink2 --threads %d --file %s_o --make-bed --remove %s --out %s"
-                % (threads, basename, outlierfile, basename)))
+        plink_string+= f" --remove {outlierfile}"
+        plink_command=shlex.split(plink_string)
+        sh.plink2(plink_command)
     else:
-        subprocess.check_output(
-            shlex.split("plink2 --threads %d --file %s_o --make-bed --out %s" %
-                        (threads, basename, basename)))
+        plink_command=shlex.split(plink_string)
+        sh.plink2(plink_command)
     # Run admixture for each k 1->"k". cvd=dictionary for CV values for each K of admixture.
     cvd = admix_runner(k)
     # Pick lowest K based on CV error minimum
@@ -291,7 +290,7 @@ def draw_pie(ax, ratios, X, Y, size):
         y = [0] + np.sin(
             np.linspace(2 * math.pi * start, 2 * math.pi *
                         (start + ratio), 30)).tolist()
-        xy1 = zip(x, y)
+        xy1 = list(zip(x, y))
         xy.append(xy1)
         start += ratio
     for i, xyi in enumerate(xy):
@@ -307,28 +306,23 @@ def draw_pie(ax, ratios, X, Y, size):
 
 def map_admix(lowestk):
     # Plot the admix results as piecharts and put each sample on a map
-    datadfM2 = pd.read_csv('%s%sM2.csv' % (pwd, basename), index_col=0)
+    datadfM2 = pd.read_csv(f'{basepath}M2.csv', index_col=0)
     # Set up Map
-    plt.title('Admixture Map k=%s' % (lowestk), fontsize=12)
-    m = MapSetUp(datadfM2)
+    plt.title(f'Admixture Map k={lowestk}', fontsize=12)
+    basemap_obj = MapSetUp(datadfM2)
     ax = plt.subplot()
     # Plot each sample as piechard of admixture results on map.
     for i, sample in enumerate(datadfM2.index.tolist()):
-        slat, slon = datadfM2.loc[[sample]]['LAT'].values[0], datadfM2.loc[[
-            sample
-        ]]['LON'].values[0]
-        admix_result_list = datadfM2.loc[[sample]][[
-            str(xx) for xx in range(lowestk)
-        ]].values.tolist()[0]
-        X, Y = m(slon, slat)
+        slat, slon = datadfM2.loc[[sample]]['LAT'].values[0], datadfM2.loc[[sample]]['LON'].values[0]
+        admix_result_list = datadfM2.loc[[sample]][[str(xx) for xx in range(lowestk)]].values.tolist()[0]
+        X, Y = basemap_obj(slon, slat)
         draw_pie(ax, admix_result_list, X, Y, size=50)
         # Assign an each sample to a k population and save in M3_lowestk df
         admixgroup = str(admix_result_list.index(max(admix_result_list)) + 1)
         datadfM2.at[sample, "AdmixGroup"] = admixgroup
-    plt.savefig(
-        "%s%s_MAP_Admix%d%s" % (pwd, basename, lowestk, imgformat), dpi=dpi)
+    plt.savefig(f"{basepath}_MAP_Admix{str(lowestk)+imgformat}", dpi=dpi)
     plt.clf()
-    datadfM2.to_csv('%s%sM3_%d.csv' % (pwd, basename, lowestk))
+    datadfM2.to_csv(f'{basepath}M3_{lowestk}.csv')
     return
 
 
@@ -338,7 +332,7 @@ def cv_plotter(cvd):
     xlist = [int(x) for x in cvd.keys()]
     ylist = [float(y) for y in cvd.values()]
     sns.pointplot(xlist, ylist)
-    plt.savefig("%s%s_CVplot%s" % (pwd, basename, imgformat), dpi=dpi)
+    plt.savefig("f{basepath}_CVplot{imgformat}", dpi=dpi)
     plt.clf()
     return
 
@@ -347,9 +341,9 @@ def plot_admixture(lowestk):
     # Plots admixture results as a map, 'structure plot', and CV plot.
     os.chdir(admixoutdir)
     # File Paths
-    qfile = '%s%s.%d.Q' % (admixoutdir, basename, lowestk)
-    sampleorderfile = '%s%s.nosex' % (admixoutdir, basename)
-    datafile = '%s%sM1.csv' % (pwd, basename)
+    qfile = f'{admixoutdir+basename}.{lowestk}.Q'
+    sampleorderfile = f'{admixoutdir+basename}.nosex'
+    datafile = f'{basepath}M1.csv'
     # Read the Plink file to get the sample names to assign to the admixture analysis
     with open(sampleorderfile, 'r') as sampleorder_handle:
         samplelist = [x.split('\t')[0] for x in sampleorder_handle.readlines()]
@@ -361,11 +355,12 @@ def plot_admixture(lowestk):
     qdf.index = qdf.index.map(str)
     ddf.index = ddf.index.map(str)
     datadfM2 = ddf.join(qdf, how='inner')
-    datadfM2.to_csv('%s%sM2.csv' % (pwd, basename))
+    datadfM2.to_csv(f'{basepath}M2.csv')
     # Plot the admix results as piecharts and put each sample on a map
     map_admix(lowestk)
+
     # Plot the PCA colored by Admix results
-    pca_plotter('M3_%d' % (lowestk), 'AdmixGroup', admix_colorpalette_list)
+    pca_plotter(f'M3_{lowestk}', 'AdmixGroup', admix_colorpalette_list)
     return
 
 
@@ -400,10 +395,10 @@ def controller(k):
     pca_plotter('M1', metagroup, colorpalette_list)
     sample_map_plotter()
     lowestk = admix_set_up(k)
-    plot_admixture(lowestk)
-    # Plot with lowestk then plot forcing k=2
-    # lowestk = 2
     # plot_admixture(lowestk)
+    # Plot with lowestk then plot forcing k=2
+    lowestk = 2
+    plot_admixture(lowestk)
     raxer(pwd,basename,bs)
     directory_cleaner(pwd)
     return
