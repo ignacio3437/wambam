@@ -17,6 +17,7 @@ def filelines_to_list(file):
 
 
 def out_dir_maker(project_path):
+    """Creates output directories for the stages of the pipeline. """
     dirs_to_make = [f"{project_path}/Blast_databases", f"{project_path}/Blast_results", f"{project_path}/Txtms_TrimtoTargets_alignments",
                     f"{project_path}/Blast_by_gene", f"{project_path}/Exonerate_out", f"{project_path}/Exonerate_clean"]
     for directory in dirs_to_make:
@@ -180,7 +181,6 @@ def maffter(fasta_file_path,out_file_path,num_threads):
 
 
 def txtm_fishing_pipe(project_path, num_threads, org_list_path, loci_list_path, blast_query_path, exonerate_query_path, e_vals, min_num_seqs):
-
     """Run pipeline in Python! Shell scripts are #OldSckool.
     This will iterate the blast searches over the e_vals.
     If a gene has no hits for a given evalue, it is lowered and searched again.
