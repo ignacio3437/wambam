@@ -12,9 +12,9 @@ from os.path import basename
 from pathlib import Path
 
 
-before_path = Path('/Users/josec/Desktop/Crinoid_capture/Nov_Update/Alignments/HybTxt_gblocked')
-badlist = ['PHRIX', 'STRONII', 'Endoxocrinus_macleraranus_C404j']
-outdir = "/Users/josec/Desktop/Crinoid_capture/Nov_Update/Alignments/Cri_MarCut_AA_GBlo/"
+before_path = Path('/Users/josec/Desktop/Crinoid_capture/Nov_Update/Alignments/Cri_MarCut_AA_seqs')
+badlist = ['ANNEI', 'ANTIDON', 'APORO', 'CENOL', 'CRINO', 'CYAT', 'DEMOC', 'DUMET', 'FLORO', 'GEPHY', 'ISOM', 'META', 'OLIGO', 'PROMA', 'PSATHY', 'PTILO', 'SACCO', 'STRONG', 'Spur']
+outdir = "/Users/josec/Desktop/Crinoid_capture/Nov_Update/Alignments/Cri_MarCut_AA_hybseqs/"
 for genefile in before_path.iterdir():
 	if str(genefile.name).startswith('.'):
 		pass

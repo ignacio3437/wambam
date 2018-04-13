@@ -332,7 +332,7 @@ def cv_plotter(cvd):
     xlist = [int(x) for x in cvd.keys()]
     ylist = [float(y) for y in cvd.values()]
     sns.pointplot(xlist, ylist)
-    plt.savefig("f{basepath}_CVplot{imgformat}", dpi=dpi)
+    plt.savefig(f"{basepath}_CVplot{imgformat}", dpi=dpi)
     plt.clf()
     return
 
