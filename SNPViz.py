@@ -1,4 +1,4 @@
-#!python3
+#!/usr/bin/env python3
 import glob
 import math
 import os
@@ -34,8 +34,8 @@ SNPViz, an automated workflow that:
 
 
 ##############################Set Up##############################
-pwd = "/Users/josec/Desktop/skrad/ipyrad/SNPViz/"  # Location of VCF file and Metadata File
-basename = "skrad_all_85_20"  # Base name of VCF file. (Eg. So.vcf basename = "So")
+pwd = "/Users/josec/Desktop/skrad/ipyrad/skrad_all_85_100/skrad_rubi_85_20_outfiles/SNPVIZ/"  # Location of VCF file and Metadata File
+basename = "skrad_rubi_85_20"  # Base name of VCF file. (Eg. So.vcf basename = "So")
 datafile = "SkadMeta.txt"  # Name of the Metadata.txt in TSV format
 metagroup = "JID"  # Name of column in Metadata.txt file to group sample by
 k = 10  # Number of Ks to run the Admixture analysis
@@ -45,10 +45,13 @@ threads = 7 # Number of cores to run the analysis
 mapbuffer = 4  # Lat/Lon buffer to zoom out of box containing geographic distribution of samples
 pretty_figures = False  # Set quality of output files 'high'=TRUE 'low'=FALSE
 outlierbutton = ""  # Add "outliersigmathresh: 7" if you want more outliers, set to "" if you want outliers removed
+maf = 0.02
+mind = 0.98
 ##################################################################
 
 # Set Global variables
 # print(f'{pwd + datafile}')
+cwd = os.path.dirname(os.path.realpath(__file__))
 datafile = pd.read_table(f'{pwd + datafile}', dtype={'Sample': object})
 baseo = f'{basename}_o'
 basepath = f'{pwd+basename}'
@@ -78,7 +81,7 @@ def vcf_to_plink(baseo):
     # Removes locci with minimum allele freq of under 5% with maf. (ie removes fixed alleles)
     sh.plink2(shlex.split(f"--file {baseo} --threads {threads} --indep-pairwise 50 10 0.1"))
     #MAF minor allele freq and mind is percent missing data cutoff before individual is removed
-    sh.plink2(shlex.split(f"--file {baseo} --threads {threads} --extract plink.prune.in --recode --freq --maf 0.02 --mind 0.9 --out {basename}"))
+    sh.plink2(shlex.split(f"--file {baseo} --threads {threads} --extract plink.prune.in --recode --freq --maf {maf} --mind {mind} --out {basename}"))
     return
 
 
@@ -375,7 +378,8 @@ def plot_admixture(lowestk):
     pca_plotter(f'M3_{lowestk}', 'AdmixGroup', admix_colorpalette_list)
 
     # Plot admix results as bargraph
-    sh.distruct(shlex.split(f"-K {lowestk} --input={admixoutdir+basename} --output={qfile+imgformat} --title=k{lowestk} --popfile={popfile}"))
+    cmd = sh.Command(f"{cwd}/distruct.py")
+    cmd(shlex.split(f"-K {lowestk} --input={admixoutdir+basename} --output={qfile+imgformat} --title=k{lowestk} --popfile={popfile}"))
     return
 
 
@@ -409,13 +413,11 @@ def controller(k):
     pca_prepper()
     pca_plotter('M1', metagroup, colorpalette_list)
     sample_map_plotter()
-    lowestk = admix_set_up(k)
-    plot_admixture(lowestk)
+    # lowestk = admix_set_up(k)
+    # plot_admixture(lowestk)
     # Plot with lowestk then plot forcing k
-    # lowestk = 7
-    # plot_admixture(lowestk)
-    # lowestk = 8
-    # plot_admixture(lowestk)
+    lowestk = 3
+    plot_admixture(lowestk)
     # raxer(pwd,basename,bs)
     directory_cleaner(pwd)
     return

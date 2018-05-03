@@ -9,7 +9,7 @@ import sys, pdb
 def plot_admixture(admixture, population_indices, population_labels, title):
 
     N,K = admixture.shape
-    colors = [colorsys.hsv_to_rgb(h,0.9,0.7) for h in np.linspace(0,1,K+1)[:-1]]
+    colors = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e', '#e6ab02', '#a6761d', '#666666']
     text_color = 'k'
     bg_color = 'w'
     fontsize = 12
