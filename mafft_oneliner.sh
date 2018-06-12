@@ -1,0 +1,1 @@
+for fna in *.fasta; do mafft --thread 8 --maxiterate 1000 --adjustdirectionaccurately --localpair $fna | sed -e 's/_R_//g' > /Users/josec/Desktop/ChromEx/Histogram_generation/AplysiaRefseqs/Histo_westvcoi/coiwes_alns/$fna ;  done
