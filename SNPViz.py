@@ -1,4 +1,4 @@
-#!python3
+#!/usr/bin/env python3
 import glob
 import math
 import os
@@ -34,27 +34,33 @@ SNPViz, an automated workflow that:
 
 
 ##############################Set Up##############################
-pwd = "/Users/josec/Desktop/Testing/So_AGRF/"  # Location of VCF file and Metadata File
-basename = "So_AGRF"  # Base name of VCF file. (Eg. So.vcf basename = "So")
-datafile = "SoMeta.txt"  # Name of the Metadata.txt in TSV format
-metagroup = "mtDNA population"  # Name of column in Metadata.txt file to group sample by
-k = 6  # Number of Ks to run the Admixture analysis
+pwd = "/Users/josec/Desktop/Linette2/So/"  # Location of VCF file and Metadata File
+basename = "Nov-So"  # Base name of VCF file. (Eg. So.vcf basename = "So")
+datafile = "SkadMeta.txt"  # Name of the Metadata.txt in TSV format
+metagroup = "JID"  # Name of column in Metadata.txt file to group sample by
+k = 4  # Number of Ks to run the Admixture analysis
 bs = 10  # Number of bootstraps for RaxML analysis
-taxon_cov = 0.90  # If a locus percent missing data is below this number, it will be thrown out
+taxon_cov = 0.8  # If a locus percent missing data is below this number, it will be thrown out
 threads = 7 # Number of cores to run the analysis
-mapbuffer = 4  # Lat/Lon buffer to zoom out of box containing geographic distribution of samples
+mapbuffer = 5  # Lat/Lon buffer to zoom out of box containing geographic distribution of samples
 pretty_figures = False  # Set quality of output files 'high'=TRUE 'low'=FALSE
-outlierbutton = "outliersigmathresh: 7"  # Add "outliersigmathresh: 7" if you want more outliers, set to "" if you want outliers removed
+outlierbutton = ""  # Add "outliersigmathresh: 7" if you want more outliers, set to "" if you want outliers removed
+maf = 0.05
+mind = 0.98
 ##################################################################
 
 # Set Global variables
+# print(f'{pwd + datafile}')
+cwd = os.path.dirname(os.path.realpath(__file__))
 datafile = pd.read_table(f'{pwd + datafile}', dtype={'Sample': object})
 baseo = f'{basename}_o'
 basepath = f'{pwd+basename}'
 pcafile = f'{basepath}.evec'
 admixoutdir = f'{pwd}admixture/'
-admix_colorpalette_list = sns.color_palette('Dark2', 8).as_hex()
+admix_colorpalette_list = sns.color_palette('Accent', 8).as_hex()
 colorpalette_list = sns.color_palette('Set1', 8).as_hex()
+
+# colorpalette_list = ['#ebf0f4', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999', '#e41a1c', '#d12e8d', '#252728']
 # Make high quality figures?
 if pretty_figures:
     dpi, xpix, imgformat = 1200, 3000, '.svg'
@@ -74,7 +80,8 @@ def vcf_to_plink(baseo):
     # Prunes the dataset for LD with indep-pairwise
     # Removes locci with minimum allele freq of under 5% with maf. (ie removes fixed alleles)
     sh.plink2(shlex.split(f"--file {baseo} --threads {threads} --indep-pairwise 50 10 0.1"))
-    sh.plink2(shlex.split(f"--file {baseo} --threads {threads} --extract plink.prune.in --recode --freq --maf 0.05 --out {basename}"))
+    #MAF minor allele freq and mind is percent missing data cutoff before individual is removed
+    sh.plink2(shlex.split(f"--file {baseo} --threads {threads} --extract plink.prune.in --recode --freq --maf {maf} --mind {mind} --out {basename}"))
     return
 
 
@@ -157,7 +164,7 @@ def pca_plotter(df, colorby, colorpalette):
         hue=colorby,
         fit_reg=False,
         legend=True,
-        legend_out=False,
+        legend_out=True,
         scatter_kws={"linewidths": .1,
                      'edgecolors': 'black',
                      's': 25})
@@ -184,7 +191,7 @@ def MapSetUp(datatable):
         llcrnrlon=lllon,
         urcrnrlon=urlon)
     basemap_obj.arcgisimage(
-        service='ESRI_Imagery_World_2D', xpixels=xpix, verbose=True, dpi=dpi)
+        service='World_Shaded_Relief', xpixels=xpix, verbose=True, dpi=dpi)
     return basemap_obj
 
 
@@ -266,6 +273,10 @@ def admix_set_up(k):
         plink_string+= f" --remove {outlierfile}"
         plink_command=shlex.split(plink_string)
         sh.plink2(plink_command)
+        plink_string2 = f"--bfile {basename} --recode --out {basename}"
+        plink_command2 = shlex.split(plink_string2)
+        sh.plink2(plink_command2)
+
     else:
         plink_command=shlex.split(plink_string)
         sh.plink2(plink_command)
@@ -348,19 +359,27 @@ def plot_admixture(lowestk):
     with open(sampleorderfile, 'r') as sampleorder_handle:
         samplelist = [x.split('\t')[0] for x in sampleorder_handle.readlines()]
     # Combine with metadata into one table joining on the sample index
-    qdf = pd.read_table(qfile, header=None, sep='\s', engine='python')
     ddf = pd.read_csv(datafile, index_col=1)
+    qdf = pd.read_table(qfile, header=None, sep='\s', engine='python')
     qdf.index = samplelist
     # Set the index as a string to make sure they join correctly.Then save
     qdf.index = qdf.index.map(str)
     ddf.index = ddf.index.map(str)
     datadfM2 = ddf.join(qdf, how='inner')
     datadfM2.to_csv(f'{basepath}M2.csv')
+    #Write metadata info for structure plot with distruct
+    datadfM2_reorder = datadfM2.reindex(samplelist) #reorders dataframe based on order of plink file
+    popfile = f'{admixoutdir}popfile.txt'
+    datadfM2_reorder.to_csv(path_or_buf=f'{popfile}', columns=[f'{metagroup}'], header=False, index=False)
     # Plot the admix results as piecharts and put each sample on a map
     map_admix(lowestk)
 
     # Plot the PCA colored by Admix results
     pca_plotter(f'M3_{lowestk}', 'AdmixGroup', admix_colorpalette_list)
+
+    # Plot admix results as bargraph
+    cmd = sh.Command(f"{cwd}/distruct.py")
+    cmd(shlex.split(f"-K {lowestk} --input={admixoutdir+basename} --output={qfile+imgformat} --title=k{lowestk} --popfile={popfile}"))
     return
 
 
@@ -394,12 +413,12 @@ def controller(k):
     pca_prepper()
     pca_plotter('M1', metagroup, colorpalette_list)
     sample_map_plotter()
-    lowestk = admix_set_up(k)
+    # lowestk = admix_set_up(k)
     # plot_admixture(lowestk)
-    # Plot with lowestk then plot forcing k=2
-    lowestk = 2
+    # Plot with lowestk then plot forcing k
+    lowestk = 3
     plot_admixture(lowestk)
-    raxer(pwd,basename,bs)
+    # raxer(pwd,basename,bs)
     directory_cleaner(pwd)
     return
 
