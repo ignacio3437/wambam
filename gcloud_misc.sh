@@ -7,6 +7,7 @@ export BOTO_CONFIG=/dev/null
 
 #To copy files from your bucket to the cloud
 gsutil cp gcs://bucket-name/you-file .
+gsutil cp gs://pteraeolidia1/Coral_public_txtm.zip .
 
 
 #SSH behind a proxy

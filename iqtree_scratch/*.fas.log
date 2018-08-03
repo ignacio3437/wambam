@@ -1,0 +1,11 @@
+IQ-TREE multicore version 1.6.2 for Mac OS X 64-bit built Mar 28 2018
+Developed by Bui Quang Minh, Nguyen Lam Tung, Olga Chernomor,
+Heiko Schmidt, Dominik Schrempf, Michael Woodhams.
+
+Host:    PM16074.local (AVX2, FMA3, 16 GB RAM)
+Command: iqtree -s *.fas -nt 2 -m GTRGAMMA
+Seed:    37250 (Using SPRNG - Scalable Parallel Random Number Generator)
+Time:    Wed Aug  1 11:13:18 2018
+Kernel:  AVX+FMA - 2 threads (8 CPU cores detected)
+
+Reading alignment file *.fas ... ERROR: File not found *.fas

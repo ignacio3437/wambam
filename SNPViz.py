@@ -34,18 +34,18 @@ SNPViz, an automated workflow that:
 
 
 ##############################Set Up##############################
-pwd = "/Users/josec/Desktop/skrad/ipyrad/skrad_all_85_100/skrad_rubi_85_20_outfiles/SNPVIZ/"  # Location of VCF file and Metadata File
-basename = "skrad_rubi_85_20"  # Base name of VCF file. (Eg. So.vcf basename = "So")
+pwd = "/Users/josec/Desktop/Linette2/So/"  # Location of VCF file and Metadata File
+basename = "Nov-So"  # Base name of VCF file. (Eg. So.vcf basename = "So")
 datafile = "SkadMeta.txt"  # Name of the Metadata.txt in TSV format
 metagroup = "JID"  # Name of column in Metadata.txt file to group sample by
-k = 10  # Number of Ks to run the Admixture analysis
+k = 4  # Number of Ks to run the Admixture analysis
 bs = 10  # Number of bootstraps for RaxML analysis
-taxon_cov = 0.10  # If a locus percent missing data is below this number, it will be thrown out
+taxon_cov = 0.8  # If a locus percent missing data is below this number, it will be thrown out
 threads = 7 # Number of cores to run the analysis
-mapbuffer = 4  # Lat/Lon buffer to zoom out of box containing geographic distribution of samples
+mapbuffer = 5  # Lat/Lon buffer to zoom out of box containing geographic distribution of samples
 pretty_figures = False  # Set quality of output files 'high'=TRUE 'low'=FALSE
 outlierbutton = ""  # Add "outliersigmathresh: 7" if you want more outliers, set to "" if you want outliers removed
-maf = 0.02
+maf = 0.05
 mind = 0.98
 ##################################################################
 
@@ -57,10 +57,10 @@ baseo = f'{basename}_o'
 basepath = f'{pwd+basename}'
 pcafile = f'{basepath}.evec'
 admixoutdir = f'{pwd}admixture/'
-admix_colorpalette_list = sns.color_palette('Dark2', 8).as_hex()
-# colorpalette_list = sns.color_palette('Set1', 12).as_hex()
+admix_colorpalette_list = sns.color_palette('Accent', 8).as_hex()
+colorpalette_list = sns.color_palette('Set1', 8).as_hex()
 
-colorpalette_list = ['#ebf0f4', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999', '#e41a1c', '#d12e8d', '#252728']
+# colorpalette_list = ['#ebf0f4', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999', '#e41a1c', '#d12e8d', '#252728']
 # Make high quality figures?
 if pretty_figures:
     dpi, xpix, imgformat = 1200, 3000, '.svg'
