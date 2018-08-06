@@ -35,10 +35,10 @@ SNPViz, an automated workflow that:
 
 ##############################Set Up##############################
 pwd = "/Users/josec/Desktop/Linette2/So/"  # Location of VCF file and Metadata File
-basename = "Nov-So"  # Base name of VCF file. (Eg. So.vcf basename = "So")
-datafile = "SkadMeta.txt"  # Name of the Metadata.txt in TSV format
-metagroup = "JID"  # Name of column in Metadata.txt file to group sample by
-k = 4  # Number of Ks to run the Admixture analysis
+basename = "Nov_So"  # Base name of VCF file. (Eg. So.vcf basename = "So")
+datafile = "So_dat.txt"  # Name of the Metadata.txt in TSV format
+metagroup = "Group"  # Name of column in Metadata.txt file to group sample by
+k = 5  # Number of Ks to run the Admixture analysis
 bs = 10  # Number of bootstraps for RaxML analysis
 taxon_cov = 0.8  # If a locus percent missing data is below this number, it will be thrown out
 threads = 7 # Number of cores to run the analysis
@@ -49,7 +49,7 @@ maf = 0.05
 mind = 0.98
 ##################################################################
 
-# Set Global variables
+# Set other parameters
 # print(f'{pwd + datafile}')
 cwd = os.path.dirname(os.path.realpath(__file__))
 datafile = pd.read_table(f'{pwd + datafile}', dtype={'Sample': object})
@@ -58,8 +58,8 @@ basepath = f'{pwd+basename}'
 pcafile = f'{basepath}.evec'
 admixoutdir = f'{pwd}admixture/'
 admix_colorpalette_list = sns.color_palette('Accent', 8).as_hex()
-colorpalette_list = sns.color_palette('Set1', 8).as_hex()
-
+# colorpalette_list = sns.color_palette('Set1', 8).as_hex()
+colorpalette_list = ['#0021f5','#fffc54','#eb3324','#57b03d']
 # colorpalette_list = ['#ebf0f4', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999', '#e41a1c', '#d12e8d', '#252728']
 # Make high quality figures?
 if pretty_figures:
@@ -191,7 +191,7 @@ def MapSetUp(datatable):
         llcrnrlon=lllon,
         urcrnrlon=urlon)
     basemap_obj.arcgisimage(
-        service='World_Shaded_Relief', xpixels=xpix, verbose=True, dpi=dpi)
+        service='ESRI_Imagery_World_2D', xpixels=xpix, verbose=True, dpi=dpi)
     return basemap_obj
 
 
@@ -413,10 +413,12 @@ def controller(k):
     pca_prepper()
     pca_plotter('M1', metagroup, colorpalette_list)
     sample_map_plotter()
-    # lowestk = admix_set_up(k)
-    # plot_admixture(lowestk)
+    lowestk = admix_set_up(k)
+    plot_admixture(lowestk)
     # Plot with lowestk then plot forcing k
     lowestk = 3
+    plot_admixture(lowestk)
+    lowestk = 4
     plot_admixture(lowestk)
     # raxer(pwd,basename,bs)
     directory_cleaner(pwd)

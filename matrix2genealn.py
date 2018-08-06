@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import sys
 
-def partitioner(part_file):
+def raxpartition_reader(part_file):
 	#Parse Raxml style partition file
 	#the partiotions list returned the start and stop coordinates of every gene in the supermatrix (concatenaged gene alignments).
 	partition_strings = []
@@ -23,13 +23,13 @@ def partitioner(part_file):
 		partitions.append((start,end))
 	return partitions
 
-def alncutter(partitions,aln_file,genealn_outdir):
-	#cuts matrix to create new alignment for each gene 
-	#writes gene alignments to genealn_outdirectory
+def alncutter(partitions,aln_file,aln_type,genealn_outdir):
+	#divides the aln_file into sub-alignments based on positions in partition list
+	#writes gene alignments to genealn_outdirectory as fasta files, ignores sequences made entirely of gaps
 	for start,end in partitions:
 		out_path = genealn_outdir/f"{start}.fas"
 		with open(out_path,'w') as out:
-			for record in SeqIO.parse (aln_file.name, "phylip-relaxed"):
+			for record in SeqIO.parse (aln_file.name, aln_type):
 				sequence = record.seq[start:end]
 				#Skip seqs made only of gaps
 				if len(set(sequence)) > 1: 
@@ -51,12 +51,28 @@ def main():
 		part_file = Path(args[3])
 	if args[4] == '--out':
 		outdir = Path(args[5])
+		#create outdir if it does not exist
+		outdir.mkdir(exist_ok=True)
 	else:
 		print(usage)
 		sys.exit(1)
+
+	#Determine alignment file type:
+	if 'fas' in aln_file.suffix:
+		aln_type="fasta"
+	elif 'phy' in aln_file.suffix:
+		aln_type = "phylip-relaxed"
+	elif 'nex' in aln_file.suffix:
+		aln_type = "nexus"
+	else:
+		print('Unknown alignment format')
+		sys.exit(1)
+
+	
+
 	# Run 
-	partitions = partitioner(part_file)
-	alncutter(partitions,aln_file,outdir)
+	partitions = raxpartition_reader(part_file)
+	alncutter(partitions,aln_file,aln_type,outdir)
 
 
 if __name__ == "__main__":
