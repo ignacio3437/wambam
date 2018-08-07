@@ -34,19 +34,21 @@ SNPViz, an automated workflow that:
 
 
 ##############################Set Up##############################
-pwd = "/Users/josec/Desktop/Linette2/So/"  # Location of VCF file and Metadata File
-basename = "Nov_So"  # Base name of VCF file. (Eg. So.vcf basename = "So")
-datafile = "So_dat.txt"  # Name of the Metadata.txt in TSV format
+pwd = "/Users/josec/Desktop/Linette2/Sy/"  # Location of VCF file and Metadata File
+basename = "Nov_Sy"  # Base name of VCF file. (Eg. Sy.vcf basename = "Sy")
+datafile = "Sy_dat.txt"  # Name of the Metadata.txt in TSV format
 metagroup = "Group"  # Name of column in Metadata.txt file to group sample by
-k = 5  # Number of Ks to run the Admixture analysis
+k = 10  # Number of Ks to run the Admixture analysis
 bs = 10  # Number of bootstraps for RaxML analysis
 taxon_cov = 0.8  # If a locus percent missing data is below this number, it will be thrown out
 threads = 7 # Number of cores to run the analysis
 mapbuffer = 5  # Lat/Lon buffer to zoom out of box containing geographic distribution of samples
 pretty_figures = False  # Set quality of output files 'high'=TRUE 'low'=FALSE
 outlierbutton = ""  # Add "outliersigmathresh: 7" if you want more outliers, set to "" if you want outliers removed
-maf = 0.05
-mind = 0.98
+maf = 0.05 # Set minor allele frequency cutoff
+mind = 0.98 # Loci with less than this percent of taxon coverage are removed
+sns_context = 'talk' # Set the size of the axis. See for more info: https://seaborn.pydata.org/tutorial/aesthetics.html#scaling-plot-elements
+fig_title  = True # Set if there should be figure titles. 
 ##################################################################
 
 # Set other parameters
@@ -59,7 +61,7 @@ pcafile = f'{basepath}.evec'
 admixoutdir = f'{pwd}admixture/'
 admix_colorpalette_list = sns.color_palette('Accent', 8).as_hex()
 # colorpalette_list = sns.color_palette('Set1', 8).as_hex()
-colorpalette_list = ['#0021f5','#fffc54','#eb3324','#57b03d']
+colorpalette_list = ['#0021f5','#ffe900','#eb3324','#57b03d']
 # colorpalette_list = ['#ebf0f4', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999', '#e41a1c', '#d12e8d', '#252728']
 # Make high quality figures?
 if pretty_figures:
@@ -119,9 +121,12 @@ def PCAer():
     # Calculate percent Variation using Eigenvalues and put as tuple to be used for plotting PCA later.
     ipervar = [(float(eig) / float(eigsum)) * 100 for eig in eigens]
     pervar = ["%.2f" % (i) for i in ipervar]
-    # String tuple to be added to plots later
-    pcaaxis = ("PCA1___PercentVar=" + pervar[0] + "_Pval=" + pvals[0],
-               "PCA2___PercentVar=" + pervar[1] + "_Pval=" + pvals[1])
+    # String tuple to be added to plots later(with pvals)
+    # pcaaxis = ("PCA1___PercentVar=" + pervar[0] + "_Pval=" + pvals[0],
+    #            "PCA2___PercentVar=" + pervar[1] + "_Pval=" + pvals[1])
+    # String tuple to be added to plots later(without pvals)
+    pcaaxis = ("% Variance = " + pervar[0],
+               "% Variance = " + pervar[1])    
     # Find outliers and print to outlierfile
     if 'REMOVED outlier' in pcaout:
         outliers = re.findall(r'REMOVED outlier (\w*)', pcaout)
@@ -154,8 +159,10 @@ def pca_prepper():
 def pca_plotter(df, colorby, colorpalette):
     # Plot PCA plot, colored by metagroup, axis are percent variation
     datatable = pd.read_csv(f'{basepath + df}.csv')
-    datatable=datatable.sort_values(metagroup)
+    datatable = datatable.sort_values(metagroup)
     sns.set_palette(colorpalette)
+    sns.set_context(sns_context)
+    sns.set_style({'font.family': ['arial']})
     pcapplot = sns.lmplot(
         'Eigen1',
         'Eigen2',
@@ -163,13 +170,14 @@ def pca_plotter(df, colorby, colorpalette):
         data=datatable,
         hue=colorby,
         fit_reg=False,
-        legend=True,
-        legend_out=True,
-        scatter_kws={"linewidths": .1,
+        legend=False,
+        # legend_out=True,
+        scatter_kws={"linewidths": .3,
                      'edgecolors': 'black',
-                     's': 25})
+                     's': 55})
     pcapplot = (pcapplot.set_axis_labels(pcaaxis[0], pcaaxis[1]))
-    plt.title('PCA plot', fontsize=8)
+    if fig_title:
+	    plt.title('PCA plot')
     pcapplot.savefig(f"{basepath}_PCA_{colorby}_{df + imgformat}",dpi=dpi)
     plt.clf()
     return
@@ -198,7 +206,8 @@ def MapSetUp(datatable):
 def sample_map_plotter():
     # Plot Map with samples colored by metagroup
     datatable = pd.read_csv(f'{basename}M1.csv')
-    plt.title('Location of Samples', fontsize=12)
+    if fig_title:
+	    plt.title('Location of Samples')
     basemap_obj = MapSetUp(datatable)
     # Loop through each of the metagroups and plot points on map with different color
     # Sort to make the colors the same in all of the graphs
@@ -319,7 +328,8 @@ def map_admix(lowestk):
     # Plot the admix results as piecharts and put each sample on a map
     datadfM2 = pd.read_csv(f'{basepath}M2.csv', index_col=0)
     # Set up Map
-    plt.title(f'Admixture Map k={lowestk}', fontsize=12)
+    if fig_title:
+	    plt.title(f'Admixture Map k={lowestk}')
     basemap_obj = MapSetUp(datadfM2)
     ax = plt.subplot()
     # Plot each sample as piechard of admixture results on map.
@@ -339,7 +349,13 @@ def map_admix(lowestk):
 
 def cv_plotter(cvd):
     # Plot the admixture CV error results as a lineplot.
-    plt.title('CV error for different K values', fontsize=8)
+    sns.set_palette(sns.color_palette("Greys_r"))
+    sns.set_context(sns_context)
+    sns.set_style({'font.family': ['arial']})
+    if fig_title:
+	    plt.title('CV error for different K values')
+    plt.xlabel("k")
+    plt.ylabel("CV error")
     xlist = [int(x) for x in cvd.keys()]
     ylist = [float(y) for y in cvd.values()]
     sns.pointplot(xlist, ylist)
@@ -412,14 +428,15 @@ def controller(k):
     pcaaxis = PCAer()
     pca_prepper()
     pca_plotter('M1', metagroup, colorpalette_list)
+    pca_plotter('M1', colorby=None , colorpalette=sns.color_palette("Greys_r"))
     sample_map_plotter()
     lowestk = admix_set_up(k)
     plot_admixture(lowestk)
-    # Plot with lowestk then plot forcing k
-    lowestk = 3
+    # manually override number of ancestral populations (k)
+    lowestk = 2
     plot_admixture(lowestk)
-    lowestk = 4
-    plot_admixture(lowestk)
+    # lowestk = 3
+    # plot_admixture(lowestk)
     # raxer(pwd,basename,bs)
     directory_cleaner(pwd)
     return
