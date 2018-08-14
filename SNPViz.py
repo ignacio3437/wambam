@@ -34,9 +34,9 @@ SNPViz, an automated workflow that:
 
 
 ##############################Set Up##############################
-pwd = "/Users/josec/Desktop/Linette2/Sy/"  # Location of VCF file and Metadata File
-basename = "Nov_Sy"  # Base name of VCF file. (Eg. Sy.vcf basename = "Sy")
-datafile = "Sy_dat.txt"  # Name of the Metadata.txt in TSV format
+pwd = "/Users/josec/Desktop/So/"  # Location of VCF file and Metadata File
+basename = "Nov_So"  # Base name of VCF file. (Eg. Sy.vcf basename = "Sy")
+datafile = "So_dat.txt"  # Name of the Metadata.txt in TSV format
 metagroup = "Group"  # Name of column in Metadata.txt file to group sample by
 k = 10  # Number of Ks to run the Admixture analysis
 bs = 10  # Number of bootstraps for RaxML analysis
@@ -433,7 +433,7 @@ def controller(k):
     lowestk = admix_set_up(k)
     plot_admixture(lowestk)
     # manually override number of ancestral populations (k)
-    lowestk = 2
+    lowestk = 3
     plot_admixture(lowestk)
     # lowestk = 3
     # plot_admixture(lowestk)
