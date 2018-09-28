@@ -1,5 +1,4 @@
 # wambam
 WAM Scripts:
 
-Have a gander...
-SNPViz takes a VCF file and associated metadata and runs admixture and smartPCA and vizualizes the results.
+Tidbits that are not ready to leave the nest yet. Have a gander...

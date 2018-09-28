@@ -5,18 +5,28 @@
 export BOTO_CONFIG=/dev/null
 
 
+#To copy files to bucket
+gsutil cp file.txt gs://bucket-name
+
 #To copy files from your bucket to the cloud
 gsutil cp gcs://bucket-name/you-file .
 gsutil cp gs://pteraeolidia1/Coral_public_txtm.zip .
 
 
-#SSH behind a proxy
-ssh USER@FINAL_DEST -o "ProxyCommand=nc -X connect -x PROXYHOST:PROXYPORT %h %p"
 
-#ssh to glcloud
-ssh -i ~/.ssh/gc_rsa ignacio3437@35.198.226.23 -o "ProxyCommand=nc -X connect -x 10.150.2.32:80 %h %p"
+#Fireup Ubuntu Instances
 
 #to generate key
-ssh-keygen -t rsa -f ~/.ssh/gc_rsa -C ignacio3437 
-#Pas for this is a*s
+ssh-keygen -t rsa -f ~/.ssh/gc_rsa_wammsu -C wammsu 
+
+
+
+#SSH behind a proxy
+# ssh USER@FINAL_DEST -o "ProxyCommand=nc -X connect -x PROXYHOST:PROXYPORT %h %p"
+
+#ssh to glcloud
+ssh -i ~/.ssh/gc_rsa_wammsu wammsu@35.234.0.89 -o "ProxyCommand=nc -X connect -x 10.150.2.32:80 %h %p"
+
+#known host error
+rm ~/.ssh/known_hosts
 
