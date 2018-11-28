@@ -10,7 +10,8 @@ gsutil cp file.txt gs://bucket-name
 
 #To copy files from your bucket to the cloud
 gsutil cp gcs://bucket-name/you-file .
-gsutil cp gs://pteraeolidia1/Coral_public_txtm.zip .
+# gsutil cp gs://pteraeolidia1/Coral_public_txtm.zip .
+gsutil cp gs://nudis2/* .
 
 
 
@@ -25,8 +26,8 @@ ssh-keygen -t rsa -f ~/.ssh/gc_rsa_wammsu -C wammsu
 # ssh USER@FINAL_DEST -o "ProxyCommand=nc -X connect -x PROXYHOST:PROXYPORT %h %p"
 
 #ssh to glcloud
+rm ~/.ssh/known_hosts # known host error
+cat ~/.ssh/gc_rsa_wammsu.pub
 ssh -i ~/.ssh/gc_rsa_wammsu wammsu@35.234.0.89 -o "ProxyCommand=nc -X connect -x 10.150.2.32:80 %h %p"
 
-#known host error
-rm ~/.ssh/known_hosts
 
