@@ -1,1 +1,3 @@
-for fna in *.fasta; do mafft --thread 8 --maxiterate 1000 --adjustdirectionaccurately --localpair $fna | sed -e 's/_R_//g' > /Users/josec/Desktop/ChromEx/Histogram_generation/AplysiaRefseqs/Histo_westvcoi/coiwes_alns/$fna ;  done
+for fna in *.fas; do mafft --thread 8 --maxiterate 1000 --adjustdirectionaccurately --localpair $fna | sed -e 's/_R_//g' > /Users/josec/Desktop/ChromEx/Histogram_generation/AplysiaRefseqs/Histo_westvcoi/coiwes_alns/$fna ;  done
+export OUTDIR='/Users/josec/Desktop/exoncap/Alveo/Draft2/80p_aa_aln'
+parallel mafft --thread 8 --maxiterate 1000 --adjustdirectionaccurately --quiet --localpair {} ">" $OUTDIR/{} ::: *.fas

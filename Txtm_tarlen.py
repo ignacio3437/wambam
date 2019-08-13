@@ -26,12 +26,17 @@ def txtm_tarlen(loci_list_path, org_list_path, geneseq_path, out_path):
 	for org in org_list:
 		org_lens_list = []
 		for loci in loci_list:
-			loci_rec_dict = SeqIO.to_dict(SeqIO.parse(f"{geneseq_path}/{loci}.fa", "fasta"))
+			loci_rec_dict = SeqIO.to_dict(SeqIO.parse(f"{geneseq_path}/{loci}", "fasta"))
 			# loci_rec_dict = SeqIO.to_dict(SeqIO.parse(f"{geneseq_path}/TRIM_{loci}.fasta", "fasta"))
 
 			try:
-				# org_lens_list.append(len(loci_rec_dict[f"{org}"].seq))
-				org_lens_list.append(len(loci_rec_dict[f"{org}-{loci}"].seq))
+				##To output len of seqs
+				org_lens_list.append(len(loci_rec_dict[f"{org}"].seq))
+				##To output presence absence of genes TWO LINES
+				# lll = len(loci_rec_dict[f"{org}"].seq)
+				# org_lens_list.append('1')
+				##For some kinds of output?
+				# org_lens_list.append(len(loci_rec_dict[f"{org}-{loci}"].seq))
 
 			except KeyError:
 				org_lens_list.append('0')
@@ -46,8 +51,8 @@ def txtm_tarlen(loci_list_path, org_list_path, geneseq_path, out_path):
 
 loci_list_path = "/Users/josec/Desktop/QuickHeatmap/genelist2.txt"
 org_list_path = "/Users/josec/Desktop/QuickHeatmap/txtmlist.txt"
-geneseq_path = "/Users/josec/Desktop/QuickHeatmap/GeneAln_14min"
-out_path = "/Users/josec/Desktop/QuickHeatmap/test2.txt"
+geneseq_path = "/Users/josec/Desktop/exoncap/Alveo/Draft2/80p_aa_aln"
+out_path = "/Users/josec/Desktop/QuickHeatmap/test1.txt"
 
 
 txtm_tarlen(loci_list_path, org_list_path, geneseq_path, out_path)

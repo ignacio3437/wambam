@@ -22,12 +22,11 @@ ssh-keygen -t rsa -f ~/.ssh/gc_rsa_wammsu -C wammsu
 
 
 
-#SSH behind a proxy
-# ssh USER@FINAL_DEST -o "ProxyCommand=nc -X connect -x PROXYHOST:PROXYPORT %h %p"
-
 #ssh to glcloud
 rm ~/.ssh/known_hosts # known host error
 cat ~/.ssh/gc_rsa_wammsu.pub
-ssh -i ~/.ssh/gc_rsa_wammsu wammsu@35.234.0.89 -o "ProxyCommand=nc -X connect -x 10.150.2.32:80 %h %p"
+ssh -i ~/.ssh/gc_rsa_wammsu wammsu@35.240.238.150 -o "ProxyCommand=nc -X connect -x 10.150.2.32:80 %h %p"
 
+# Activate Agalma Conda environment
+source activate agalma 
 
