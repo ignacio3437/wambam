@@ -1,0 +1,2 @@
+#Change the name of file endings
+for file in *.fasta; do mv "$file" "$(basename "$file" .fasta).fas" ;done
